@@ -274,6 +274,10 @@ def change_password():
 
 # ── Endpoints ──────────────────────────────────────────────────────────────
 
+@app.route('/')
+def index():
+    return {'status': 'ok'}, 200
+
 @app.route("/api/health", methods=["GET"])
 def health():
     db_ok = os.path.exists(DB_PATH)
