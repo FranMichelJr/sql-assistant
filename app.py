@@ -16,7 +16,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "socketio-dev-secret")
-CORS(app, resources={r"/*": {"origins": "*"}})
+CORS(app, origins=["https://sql-assistant-ai.netlify.app", "http://localhost:3000"])
 socketio = SocketIO(
     app,
     cors_allowed_origins="*",
