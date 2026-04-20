@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Category as CategoryIcon } from '@carbon/icons-react'
+import CategoryIcon from '@carbon/icons-react/es/Category'
 import type { Category } from '@/types'
 import { api } from '@/lib/api'
 import {

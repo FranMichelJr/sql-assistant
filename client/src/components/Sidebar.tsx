@@ -1,5 +1,6 @@
 import { motion, AnimatePresence } from 'framer-motion'
-import { Time, TrashCan } from '@carbon/icons-react'
+import Time from '@carbon/icons-react/es/Time'
+import TrashCan from '@carbon/icons-react/es/TrashCan'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import type { HistoryItem } from '@/types'

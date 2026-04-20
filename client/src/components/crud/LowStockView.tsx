@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
-import { WarningAlt } from '@carbon/icons-react'
+import WarningAlt from '@carbon/icons-react/es/WarningAlt'
 import type { Product } from '@/types'
 import { api } from '@/lib/api'
 import { CrudTableWrap, Th, Td, TableSkeleton, ErrorBanner, ExportButton } from './shared'

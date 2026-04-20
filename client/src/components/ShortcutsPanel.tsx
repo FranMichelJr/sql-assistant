@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion'
-import { Close } from '@carbon/icons-react'
+import Close from '@carbon/icons-react/es/Close'
 
 interface Shortcut {
   keys: string[]

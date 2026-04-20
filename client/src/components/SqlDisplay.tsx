@@ -1,9 +1,12 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { Copy, Check } from 'lucide-react'
-import { Terminal } from '@carbon/icons-react'
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
-import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'
+import Terminal from '@carbon/icons-react/es/Terminal'
+import SyntaxHighlighter from 'react-syntax-highlighter/dist/esm/light'
+import sql from 'react-syntax-highlighter/dist/esm/languages/prism/sql'
+import vscDarkPlus from 'react-syntax-highlighter/dist/esm/styles/prism/vsc-dark-plus'
+// @ts-expect-error light build requires manual language registration
+SyntaxHighlighter.registerLanguage('sql', sql)
 import { Button } from '@/components/ui/button'
 
 const syntaxStyle = {

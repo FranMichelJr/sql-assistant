@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion'
-import { Settings } from '@carbon/icons-react'
-import { DataBase } from '@carbon/icons-react'
+import Settings from '@carbon/icons-react/es/Settings'
+import DataBase from '@carbon/icons-react/es/DataBase'
 import { Sun, Moon } from 'lucide-react'
 import { useTheme } from 'next-themes'
 

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { UserMultiple } from '@carbon/icons-react'
+import UserMultiple from '@carbon/icons-react/es/UserMultiple'
 import type { Customer } from '@/types'
 import { api } from '@/lib/api'
 import { exportToCsv } from '@/lib/csv'

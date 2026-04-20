@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { OrderDetails } from '@carbon/icons-react'
+import OrderDetails from '@carbon/icons-react/es/OrderDetails'
 import { Eye, Plus, X, Search, Trash2 } from 'lucide-react'
 import type { Order, OrderStatus, OrderDetail, Customer, Product, NewOrderItem } from '@/types'
 import { api } from '@/lib/api'

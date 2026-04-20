@@ -1,6 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
-import { Analytics, OrderDetails, WarningAlt, UserMultiple } from '@carbon/icons-react'
+import Analytics from '@carbon/icons-react/es/Analytics'
+import OrderDetails from '@carbon/icons-react/es/OrderDetails'
+import WarningAlt from '@carbon/icons-react/es/WarningAlt'
+import UserMultiple from '@carbon/icons-react/es/UserMultiple'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer,

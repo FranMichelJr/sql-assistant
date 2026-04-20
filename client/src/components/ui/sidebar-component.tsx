@@ -1,26 +1,24 @@
 "use client";
 
 import React, { useState } from "react";
-import {
-  Search as SearchIcon,
-  Settings as SettingsIcon,
-  User as UserIcon,
-  ChevronDown as ChevronDownIcon,
-  Time,
-  CheckmarkOutline,
-  ErrorFilled,
-  TrashCan,
-  DataBase,
-  Query,
-  Table,
-  Box,
-  UserMultiple,
-  OrderDetails,
-  Category,
-  Dashboard,
-  WarningAlt,
-  Analytics,
-} from "@carbon/icons-react";
+import SearchIcon from '@carbon/icons-react/es/Search'
+import SettingsIcon from '@carbon/icons-react/es/Settings'
+import UserIcon from '@carbon/icons-react/es/User'
+import ChevronDownIcon from '@carbon/icons-react/es/ChevronDown'
+import Time from '@carbon/icons-react/es/Time'
+import CheckmarkOutline from '@carbon/icons-react/es/CheckmarkOutline'
+import ErrorFilled from '@carbon/icons-react/es/ErrorFilled'
+import TrashCan from '@carbon/icons-react/es/TrashCan'
+import DataBase from '@carbon/icons-react/es/DataBase'
+import Query from '@carbon/icons-react/es/Query'
+import Table from '@carbon/icons-react/es/Table'
+import Box from '@carbon/icons-react/es/Box'
+import UserMultiple from '@carbon/icons-react/es/UserMultiple'
+import OrderDetails from '@carbon/icons-react/es/OrderDetails'
+import Category from '@carbon/icons-react/es/Category'
+import Dashboard from '@carbon/icons-react/es/Dashboard'
+import WarningAlt from '@carbon/icons-react/es/WarningAlt'
+import Analytics from '@carbon/icons-react/es/Analytics'
 import type { HistoryItem, AppView, User, UserRole } from "@/types";
 import { LogOut } from "lucide-react";
 

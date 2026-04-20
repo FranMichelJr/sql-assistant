@@ -1,5 +1,10 @@
 import { motion, AnimatePresence } from 'framer-motion'
-import { Close, TrashCan, AddLarge, Edit, Download, Search } from '@carbon/icons-react'
+import Close from '@carbon/icons-react/es/Close'
+import TrashCan from '@carbon/icons-react/es/TrashCan'
+import AddLarge from '@carbon/icons-react/es/AddLarge'
+import Edit from '@carbon/icons-react/es/Edit'
+import Download from '@carbon/icons-react/es/Download'
+import Search from '@carbon/icons-react/es/Search'
 import React from 'react'
 
 // ── Input / select styles ─────────────────────────────────────────────────

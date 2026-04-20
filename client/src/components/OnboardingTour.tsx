@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Close } from '@carbon/icons-react'
+import Close from '@carbon/icons-react/es/Close'
 
 const STORAGE_KEY = 'sql_assistant_onboarding_done'
 

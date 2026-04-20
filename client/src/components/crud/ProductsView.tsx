@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Box } from '@carbon/icons-react'
+import Box from '@carbon/icons-react/es/Box'
 import { TrendingUp, TrendingDown, History, X } from 'lucide-react'
 import type { Product, Category, StockMovement } from '@/types'
 import { api } from '@/lib/api'

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
-import { Analytics } from '@carbon/icons-react'
+import Analytics from '@carbon/icons-react/es/Analytics'
 import { FileText } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,

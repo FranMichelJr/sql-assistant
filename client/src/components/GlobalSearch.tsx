@@ -1,7 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Search, Close } from '@carbon/icons-react'
-import { Box, UserMultiple, OrderDetails } from '@carbon/icons-react'
+import Search from '@carbon/icons-react/es/Search'
+import Close from '@carbon/icons-react/es/Close'
+import Box from '@carbon/icons-react/es/Box'
+import UserMultiple from '@carbon/icons-react/es/UserMultiple'
+import OrderDetails from '@carbon/icons-react/es/OrderDetails'
 import { api } from '@/lib/api'
 import type { HistoryItem, AppView } from '@/types'
 

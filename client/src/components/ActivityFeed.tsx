@@ -1,5 +1,6 @@
 import { motion, AnimatePresence } from 'framer-motion'
-import { Close, TrashCan } from '@carbon/icons-react'
+import Close from '@carbon/icons-react/es/Close'
+import TrashCan from '@carbon/icons-react/es/TrashCan'
 import { useActivity, type ActivityEvent, type ActivityType } from '@/context/ActivityContext'
 
 function relativeTime(date: Date): string {
