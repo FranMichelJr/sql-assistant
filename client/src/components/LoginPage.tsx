@@ -116,28 +116,6 @@ export default function LoginPage() {
           </form>
         </div>
 
-        {/* Hint */}
-        <div className="mt-5 space-y-1.5">
-          {[
-            { email: 'admin@sql.com', role: 'admin' },
-            { email: 'vendedor@sql.com', role: 'vendedor' },
-            { email: 'bodega@sql.com', role: 'bodega' },
-          ].map(u => (
-            <button
-              key={u.email}
-              type="button"
-              onClick={() => { setEmail(u.email); setPassword(`${u.role}123`) }}
-              className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-muted/40 border border-border/60 hover:border-border transition-colors group"
-            >
-              <span className="text-[11px] font-mono text-muted-foreground/60 group-hover:text-muted-foreground transition-colors">
-                {u.email}
-              </span>
-              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-muted border border-border/60 text-muted-foreground capitalize">
-                {u.role}
-              </span>
-            </button>
-          ))}
-        </div>
       </motion.div>
     </div>
   )

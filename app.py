@@ -32,15 +32,17 @@ JWT_EXPIRY_HOURS = 8
 # ── Usuarios hardcodeados ──────────────────────────────────────────────────
 
 USERS = {
-    "admin@sql.com":    {"hash": generate_password_hash("admin123"),    "role": "admin",    "name": "Admin"},
-    "vendedor@sql.com": {"hash": generate_password_hash("vendedor123"), "role": "vendedor", "name": "Vendedor"},
-    "bodega@sql.com":   {"hash": generate_password_hash("bodega123"),   "role": "bodega",   "name": "Bodega"},
+    "admin@sql.com":    {"hash": generate_password_hash("admin123"),    "role": "admin",       "name": "Admin"},
+    "vendedor@sql.com": {"hash": generate_password_hash("vendedor123"), "role": "vendedor",    "name": "Vendedor"},
+    "bodega@sql.com":   {"hash": generate_password_hash("bodega123"),   "role": "bodega",      "name": "Bodega"},
+    "demo@sql.com":     {"hash": generate_password_hash("demo123"),     "role": "espectador",  "name": "Demo"},
 }
 
 ROLE_ROUTES = {
-    "admin":    {"dashboard", "query", "products", "customers", "orders", "categories", "lowstock"},
-    "vendedor": {"dashboard", "orders", "customers"},
-    "bodega":   {"products", "categories", "lowstock"},
+    "admin":      {"dashboard", "query", "products", "customers", "orders", "categories", "lowstock"},
+    "vendedor":   {"dashboard", "orders", "customers"},
+    "bodega":     {"products", "categories", "lowstock"},
+    "espectador": {"dashboard", "products", "customers", "orders"},
 }
 
 DB_SCHEMA = """
@@ -821,6 +823,6 @@ def on_disconnect():
     pass
 
 
-if __name__ == "__main__":
-    print("Iniciando SQL Assistant API en http://localhost:8000")
-    socketio.run(app, debug=True, port=8000, use_reloader=False, allow_unsafe_werkzeug=True)
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 8000))
+    socketio.run(app, host='0.0.0.0', port=port, debug=False, use_reloader=False, allow_unsafe_werkzeug=True)

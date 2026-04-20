@@ -51,15 +51,17 @@ const CRUD_LABELS: Partial<Record<AppView, string>> = {
 }
 
 const ROLE_ALLOWED: Record<UserRole, AppView[]> = {
-  admin:    ['dashboard', 'query', 'products', 'customers', 'orders', 'categories', 'lowstock', 'reports', 'settings', 'profile'],
-  vendedor: ['dashboard', 'orders', 'customers', 'reports', 'settings', 'profile'],
-  bodega:   ['products', 'categories', 'lowstock', 'settings', 'profile'],
+  admin:      ['dashboard', 'query', 'products', 'customers', 'orders', 'categories', 'lowstock', 'reports', 'settings', 'profile'],
+  vendedor:   ['dashboard', 'orders', 'customers', 'reports', 'settings', 'profile'],
+  bodega:     ['products', 'categories', 'lowstock', 'settings', 'profile'],
+  espectador: ['dashboard', 'products', 'customers', 'orders', 'reports', 'profile'],
 }
 
 const DEFAULT_VIEW: Record<UserRole, AppView> = {
-  admin:    'dashboard',
-  vendedor: 'dashboard',
-  bodega:   'products',
+  admin:      'dashboard',
+  vendedor:   'dashboard',
+  bodega:     'products',
+  espectador: 'dashboard',
 }
 
 function recordQueryDate() {
@@ -115,7 +117,7 @@ export default function App() {
   // Fetch low-stock count
   useEffect(() => {
     if (!user || !token) return
-    if (user.role === 'vendedor') return
+    if (user.role === 'vendedor' || user.role === 'espectador') return
     api.dashboard.get()
       .then(d => setLowStockCount(d.low_stock_count))
       .catch(() => {})

@@ -62,7 +62,7 @@ export interface Order {
 
 export type AppView = 'query' | 'dashboard' | 'products' | 'customers' | 'orders' | 'categories' | 'lowstock' | 'reports' | 'settings' | 'profile'
 
-export type UserRole = 'admin' | 'vendedor' | 'bodega'
+export type UserRole = 'admin' | 'vendedor' | 'bodega' | 'espectador'
 
 export type NotificationType = 'new_order' | 'low_stock' | 'status_change'
 

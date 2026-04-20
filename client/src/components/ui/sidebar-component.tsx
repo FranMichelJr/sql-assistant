@@ -130,15 +130,24 @@ function IconNavButton({
 type NavSection = "history" | "tables" | "queries" | "settings";
 
 const ROLE_ALLOWED: Record<UserRole, AppView[]> = {
-  admin:    ["dashboard", "query", "products", "customers", "orders", "categories", "lowstock", "reports", "settings", "profile"],
-  vendedor: ["dashboard", "orders", "customers", "reports", "settings", "profile"],
-  bodega:   ["products", "categories", "lowstock", "settings", "profile"],
+  admin:      ["dashboard", "query", "products", "customers", "orders", "categories", "lowstock", "reports", "settings", "profile"],
+  vendedor:   ["dashboard", "orders", "customers", "reports", "settings", "profile"],
+  bodega:     ["products", "categories", "lowstock", "settings", "profile"],
+  espectador: ["dashboard", "products", "customers", "orders", "reports", "profile"],
 };
 
 const ROLE_BADGE_COLOR: Record<UserRole, string> = {
-  admin:    "bg-primary/20 text-primary border-primary/30",
-  vendedor: "bg-blue-500/20 text-blue-300 border-blue-500/30",
-  bodega:   "bg-emerald-500/20 text-emerald-300 border-emerald-500/30",
+  admin:      "bg-primary/20 text-primary border-primary/30",
+  vendedor:   "bg-blue-500/20 text-blue-300 border-blue-500/30",
+  bodega:     "bg-emerald-500/20 text-emerald-300 border-emerald-500/30",
+  espectador: "bg-muted text-muted-foreground border-border",
+};
+
+const ROLE_LABEL: Record<UserRole, string> = {
+  admin:      "admin",
+  vendedor:   "vendedor",
+  bodega:     "bodega",
+  espectador: "Demo",
 };
 
 function IconNavigation({
@@ -315,7 +324,7 @@ function IconNavigation({
               <UserIcon size={14} />
             </div>
             <span className={`text-[8px] font-mono px-1.5 py-0.5 rounded border capitalize ${ROLE_BADGE_COLOR[user.role]}`}>
-              {user.role}
+              {ROLE_LABEL[user.role]}
             </span>
           </button>
         )}
