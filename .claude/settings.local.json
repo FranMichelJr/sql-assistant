@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python *)",
+      "Bash(npx tsc *)",
+      "Bash(npm install *)",
+      "Bash(pip install *)",
+      "Bash(npm run *)",
+      "Bash(curl -s http://localhost:5174)",
+      "Bash(npm list *)",
+      "Bash(node -e \"const icons = require\\('/c/Users/franm/sql-assistant/client/node_modules/@carbon/icons-react'\\); console.log\\('Logout' in icons, 'UserProfile' in icons, 'Locked' in icons\\)\")",
+      "Bash(node *)"
+    ]
+  }
+}
