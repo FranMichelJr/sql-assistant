@@ -133,7 +133,7 @@ const ROLE_ALLOWED: Record<UserRole, AppView[]> = {
   admin:      ["dashboard", "query", "products", "customers", "orders", "categories", "lowstock", "reports", "settings", "profile"],
   vendedor:   ["dashboard", "orders", "customers", "reports", "settings", "profile"],
   bodega:     ["products", "categories", "lowstock", "settings", "profile"],
-  espectador: ["dashboard", "products", "customers", "orders", "reports", "profile"],
+  espectador: ["dashboard", "query", "products", "customers", "orders", "reports", "profile"],
 };
 
 const ROLE_BADGE_COLOR: Record<UserRole, string> = {

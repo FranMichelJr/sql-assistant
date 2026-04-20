@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { useAuth } from '@/context/AuthContext'
 import { motion, AnimatePresence } from 'framer-motion'
 import OrderDetails from '@carbon/icons-react/es/OrderDetails'
 import { Eye, Plus, X, Search, Trash2 } from 'lucide-react'
@@ -334,6 +335,8 @@ function NewOrderModal({
 // ── Main View ─────────────────────────────────────────────────────────────
 
 export function OrdersView() {
+  const { user } = useAuth()
+  const isReadonly = user?.role === 'espectador'
   const [items, setItems] = useState<Order[]>([])
   const [customers, setCustomers] = useState<Customer[]>([])
   const [products, setProducts] = useState<Product[]>([])
@@ -416,7 +419,7 @@ export function OrdersView() {
         icon={<OrderDetails size={18} />}
         title="Órdenes"
         count={filtered.length}
-        onAdd={() => setNewOrderOpen(true)}
+        onAdd={isReadonly ? undefined : () => setNewOrderOpen(true)}
         addLabel="Nueva Orden"
       />
 
@@ -489,16 +492,18 @@ export function OrdersView() {
                       title="Ver detalle">
                       <Eye size={14} />
                     </button>
-                    <button type="button" onClick={() => startEdit(o)}
-                      className="size-7 flex items-center justify-center rounded-lg hover:bg-muted/60 text-muted-foreground hover:text-foreground transition-colors"
-                      title="Cambiar estado">
-                      <span className="text-xs font-mono">⇄</span>
-                    </button>
-                    <button type="button" onClick={() => setDeleteId(o.id)}
-                      className="size-7 flex items-center justify-center rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
-                      title="Eliminar">
-                      <Trash2 size={14} />
-                    </button>
+                    {!isReadonly && <>
+                      <button type="button" onClick={() => startEdit(o)}
+                        className="size-7 flex items-center justify-center rounded-lg hover:bg-muted/60 text-muted-foreground hover:text-foreground transition-colors"
+                        title="Cambiar estado">
+                        <span className="text-xs font-mono">⇄</span>
+                      </button>
+                      <button type="button" onClick={() => setDeleteId(o.id)}
+                        className="size-7 flex items-center justify-center rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                        title="Eliminar">
+                        <Trash2 size={14} />
+                      </button>
+                    </>}
                   </div>
                 </Td>
               </tr>

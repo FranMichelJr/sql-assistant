@@ -42,7 +42,7 @@ ROLE_ROUTES = {
     "admin":      {"dashboard", "query", "products", "customers", "orders", "categories", "lowstock"},
     "vendedor":   {"dashboard", "orders", "customers"},
     "bodega":     {"products", "categories", "lowstock"},
-    "espectador": {"dashboard", "products", "customers", "orders"},
+    "espectador": {"dashboard", "query", "products", "customers", "orders"},
 }
 
 DB_SCHEMA = """
@@ -292,7 +292,7 @@ def get_schema():
 
 
 @app.route("/api/query", methods=["POST"])
-@require_auth(roles=["admin"])
+@require_auth(roles=["admin", "espectador"])
 def query():
     data = request.get_json(silent=True) or {}
     question = (data.get("question") or "").strip()
@@ -350,7 +350,7 @@ def db_run(sql: str, params: tuple = ()) -> int:
 # ── Categories ─────────────────────────────────────────────────────────────
 
 @app.route("/api/categories", methods=["GET"])
-@require_auth(roles=["admin", "bodega"])
+@require_auth(roles=["admin", "bodega", "espectador"])
 def list_categories():
     return jsonify(db_all("SELECT * FROM categories ORDER BY name"))
 
@@ -386,7 +386,7 @@ def delete_category(cid: int):
 # ── Products ───────────────────────────────────────────────────────────────
 
 @app.route("/api/products", methods=["GET"])
-@require_auth(roles=["admin", "bodega"])
+@require_auth(roles=["admin", "bodega", "espectador"])
 def list_products():
     rows = db_all("""
         SELECT p.*, c.name AS category_name
@@ -435,7 +435,7 @@ def delete_product(pid: int):
 # ── Customers ──────────────────────────────────────────────────────────────
 
 @app.route("/api/customers", methods=["GET"])
-@require_auth(roles=["admin", "vendedor"])
+@require_auth(roles=["admin", "vendedor", "espectador"])
 def list_customers():
     return jsonify(db_all("SELECT * FROM customers ORDER BY first_name, last_name"))
 
@@ -482,7 +482,7 @@ def delete_customer(cid: int):
 # ── Orders ─────────────────────────────────────────────────────────────────
 
 @app.route("/api/orders", methods=["GET"])
-@require_auth(roles=["admin", "vendedor"])
+@require_auth(roles=["admin", "vendedor", "espectador"])
 def list_orders():
     rows = db_all("""
         SELECT o.*, c.first_name || ' ' || c.last_name AS customer_name
@@ -558,7 +558,7 @@ def create_order():
 
 
 @app.route("/api/orders/<int:oid>", methods=["GET"])
-@require_auth(roles=["admin", "vendedor"])
+@require_auth(roles=["admin", "vendedor", "espectador"])
 def get_order(oid: int):
     conn = get_db_connection()
     try:
@@ -675,7 +675,7 @@ def add_stock_movement(pid: int):
 # ── Reports ────────────────────────────────────────────────────────────────
 
 @app.route("/api/reports/sales", methods=["GET"])
-@require_auth(roles=["admin", "vendedor"])
+@require_auth(roles=["admin", "vendedor", "espectador"])
 def report_sales():
     period = request.args.get("period", "month")
     if period == "week":
@@ -704,7 +704,7 @@ def report_sales():
 
 
 @app.route("/api/reports/products", methods=["GET"])
-@require_auth(roles=["admin", "vendedor"])
+@require_auth(roles=["admin", "vendedor", "espectador"])
 def report_products():
     conn = get_db_connection()
     try:
@@ -762,7 +762,7 @@ def mark_all_notifications_read():
 # ── Dashboard ──────────────────────────────────────────────────────────────
 
 @app.route("/api/dashboard", methods=["GET"])
-@require_auth(roles=["admin", "vendedor"])
+@require_auth(roles=["admin", "vendedor", "espectador"])
 def dashboard():
     conn = get_db_connection()
     try:

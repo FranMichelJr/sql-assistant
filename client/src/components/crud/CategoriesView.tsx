@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useAuth } from '@/context/AuthContext'
 import { motion, AnimatePresence } from 'framer-motion'
 import CategoryIcon from '@carbon/icons-react/es/Category'
 import type { Category } from '@/types'
@@ -12,6 +13,8 @@ import {
 const EMPTY: Omit<Category, 'id'> = { name: '', description: '' }
 
 export function CategoriesView() {
+  const { user } = useAuth()
+  const isReadonly = user?.role === 'espectador'
   const [items, setItems] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -72,7 +75,7 @@ export function CategoriesView() {
         icon={<CategoryIcon size={18} />}
         title="Categorías"
         count={items.length}
-        onAdd={openAdd}
+        onAdd={isReadonly ? undefined : openAdd}
         addLabel="Nueva categoría"
       />
 
@@ -98,7 +101,7 @@ export function CategoriesView() {
                 <Td className="text-muted-foreground font-mono text-xs">{c.id}</Td>
                 <Td className="font-medium">{c.name}</Td>
                 <Td className="text-muted-foreground max-w-xs truncate">{c.description || '—'}</Td>
-                <Td><RowActions onEdit={() => openEdit(c)} onDelete={() => setDeleteId(c.id)} /></Td>
+                <Td>{!isReadonly && <RowActions onEdit={() => openEdit(c)} onDelete={() => setDeleteId(c.id)} />}</Td>
               </tr>
             ))
           )}

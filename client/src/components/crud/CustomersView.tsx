@@ -19,6 +19,7 @@ const EMPTY: CustomerForm = { first_name: '', last_name: '', email: '', phone: '
 export function CustomersView() {
   const { addActivity } = useActivity()
   const { user } = useAuth()
+  const isReadonly = user?.role === 'espectador'
   const [items, setItems] = useState<Customer[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -103,7 +104,7 @@ export function CustomersView() {
         icon={<UserMultiple size={18} />}
         title="Clientes"
         count={filtered.length}
-        onAdd={openAdd}
+        onAdd={isReadonly ? undefined : openAdd}
         addLabel="Nuevo cliente"
       />
 
@@ -140,7 +141,7 @@ export function CustomersView() {
                 <Td className="text-muted-foreground font-mono text-xs">{c.phone || '—'}</Td>
                 <Td className="text-muted-foreground">{c.city || '—'}</Td>
                 <Td><CountryBadge country={c.country} /></Td>
-                <Td><RowActions onEdit={() => openEdit(c)} onDelete={() => setDeleteId(c.id)} /></Td>
+                <Td>{!isReadonly && <RowActions onEdit={() => openEdit(c)} onDelete={() => setDeleteId(c.id)} />}</Td>
               </tr>
             ))
           )}

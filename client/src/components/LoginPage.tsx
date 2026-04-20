@@ -43,6 +43,20 @@ export default function LoginPage() {
           <p className="text-xs text-muted-foreground mt-1 font-mono">Acceso al sistema</p>
         </div>
 
+        {/* Demo user quick-fill */}
+        <button
+          type="button"
+          onClick={() => { setEmail('demo@sql.com'); setPassword('demo123') }}
+          className="w-full flex items-center justify-between px-3 py-2 mb-4 rounded-lg bg-muted/40 border border-border/60 hover:border-border transition-colors group"
+        >
+          <span className="text-[11px] font-mono text-muted-foreground/70 group-hover:text-muted-foreground transition-colors">
+            demo@sql.com
+          </span>
+          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-muted border border-border text-muted-foreground">
+            Demo
+          </span>
+        </button>
+
         {/* Card */}
         <div className="bg-card border border-border rounded-2xl p-6">
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
@@ -115,6 +129,15 @@ export default function LoginPage() {
             </button>
           </form>
         </div>
+
+        {/* Contact message */}
+        <p className="mt-4 text-center text-[11px] font-mono text-muted-foreground/60 leading-relaxed px-2">
+          ⚠️ La cuenta demo es solo para modo espectador.<br />
+          Para ver la funcionalidad completa, contactame:<br />
+          <a href="mailto:franmicheljr@gmail.com" className="text-primary/70 hover:text-primary transition-colors">
+            franmicheljr@gmail.com
+          </a>
+        </p>
 
       </motion.div>
     </div>

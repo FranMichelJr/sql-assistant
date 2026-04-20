@@ -220,6 +220,7 @@ function MovementHistoryModal({ product, onClose }: { product: Product; onClose:
 export function ProductsView() {
   const { addActivity } = useActivity()
   const { user } = useAuth()
+  const isReadonly = user?.role === 'espectador'
   const [items, setItems] = useState<Product[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
@@ -320,7 +321,7 @@ export function ProductsView() {
         icon={<Box size={18} />}
         title="Productos"
         count={filtered.length}
-        onAdd={openAdd}
+        onAdd={isReadonly ? undefined : openAdd}
         addLabel="Nuevo producto"
       />
 
@@ -371,7 +372,7 @@ export function ProductsView() {
                       title="Ver historial de stock">
                       <History size={14} />
                     </button>
-                    <RowActions onEdit={() => openEdit(p)} onDelete={() => setDeleteId(p.id)} />
+                    {!isReadonly && <RowActions onEdit={() => openEdit(p)} onDelete={() => setDeleteId(p.id)} />}
                   </div>
                 </Td>
               </tr>
