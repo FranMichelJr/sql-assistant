@@ -13,8 +13,12 @@ export default defineConfig({
   server: {
     port: 3000,
   },
+  optimizeDeps: {
+    include: ['react', 'react-dom'],
+  },
   build: {
     rollupOptions: {
+      external: [],
       output: {
         manualChunks(id) {
           if (!id.includes('node_modules')) return
@@ -33,6 +37,9 @@ export default defineConfig({
           return 'vendor'
         },
       },
+    },
+    commonjsOptions: {
+      include: [/node_modules/],
     },
   },
 })
