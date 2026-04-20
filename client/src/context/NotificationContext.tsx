@@ -3,7 +3,7 @@ import { io, Socket } from 'socket.io-client'
 import { useAuth } from './AuthContext'
 import type { AppNotification } from '@/types'
 
-const BASE = 'http://localhost:8000'
+const BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
 
 interface NotifContextValue {
   notifications: AppNotification[]

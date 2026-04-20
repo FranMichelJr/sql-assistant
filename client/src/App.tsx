@@ -30,7 +30,7 @@ import { useActivity } from '@/context/ActivityContext'
 import { api } from '@/lib/api'
 import type { QueryResult, HistoryItem, StatusMessage, AppView, UserRole } from '@/types'
 
-const API_BASE = 'http://localhost:8000'
+const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
 
 const LOADING_MSGS = [
   'Consultando a Claude...',

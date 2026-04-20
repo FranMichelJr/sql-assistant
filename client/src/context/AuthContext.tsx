@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect } from 'react'
 import type { User } from '@/types'
 
-const BASE = 'http://localhost:8000'
+const BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
 
 interface AuthContextValue {
   user: User | null
