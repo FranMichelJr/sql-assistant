@@ -1,4 +1,4 @@
-# SQL Assistant
+# SQL Assistant 
 
 > Query your database with plain Spanish. Powered by Claude Opus 4.
 
