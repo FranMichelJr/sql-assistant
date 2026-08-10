@@ -1,11 +1,15 @@
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import Close from '@carbon/icons-react/es/Close'
 import TrashCan from '@carbon/icons-react/es/TrashCan'
 import AddLarge from '@carbon/icons-react/es/AddLarge'
 import Edit from '@carbon/icons-react/es/Edit'
-import Download from '@carbon/icons-react/es/Download'
 import Search from '@carbon/icons-react/es/Search'
 import React from 'react'
+import type { Canal } from '@/types'
+
+export const CANAL_LABEL: Record<Canal, string> = {
+  mostrador: 'Mostrador', whatsapp: 'WhatsApp', mercado_libre: 'Mercado Libre', reparto: 'Reparto',
+}
 
 // ── Input / select styles ─────────────────────────────────────────────────
 export const inputCls =
@@ -137,11 +141,11 @@ export function CrudHeader({ icon, title, count, onAdd, addLabel = 'Agregar' }: 
   return (
     <div className="flex items-center justify-between mb-6">
       <div className="flex items-center gap-3">
-        <div className="size-9 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
+        <div className="size-9 rounded-full bg-primary/10 border-2 border-primary/25 flex items-center justify-center text-primary">
           {icon}
         </div>
         <div>
-          <h1 className="text-lg font-semibold text-foreground">{title}</h1>
+          <h1 className="text-xl font-serif text-foreground">{title}</h1>
           <p className="text-xs text-muted-foreground font-mono">{count} registros</p>
         </div>
       </div>
@@ -171,7 +175,7 @@ export function CrudTableWrap({ children }: { children: React.ReactNode }) {
   )
 }
 
-export function Th({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+export function Th({ children, className = '' }: { children?: React.ReactNode; className?: string }) {
   return (
     <th className={`px-4 py-3 text-left text-[11px] font-semibold text-muted-foreground uppercase tracking-wider bg-muted/30 border-b border-border ${className}`}>
       {children}
@@ -275,75 +279,11 @@ export function FilterSelect({ value, onChange, children }: {
   )
 }
 
-export function ExportButton({ onClick }: { onClick: () => void }) {
-  return (
-    <button
-      type="button" onClick={onClick}
-      className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border border-border/60 bg-muted/30 text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors whitespace-nowrap shrink-0"
-    >
-      <Download size={13} />
-      Exportar CSV
-    </button>
-  )
-}
-
 export function ViewToolbar({ children }: { children: React.ReactNode }) {
   return <div className="flex items-center gap-2 flex-wrap">{children}</div>
 }
 
-// ── Country badge ─────────────────────────────────────────────────────────
-
-const COUNTRY_COLORS: Record<string, { bg: string; color: string }> = {
-  'españa':         { bg: '#c60b1e', color: '#f1bf00' },
-  'spain':          { bg: '#c60b1e', color: '#f1bf00' },
-  'méxico':         { bg: '#006847', color: '#ce1126' },
-  'mexico':         { bg: '#006847', color: '#ce1126' },
-  'usa':            { bg: '#002868', color: '#ffffff' },
-  'united states':  { bg: '#002868', color: '#ffffff' },
-  'argentina':      { bg: '#74acdf', color: '#ffffff' },
-  'brasil':         { bg: '#009c3b', color: '#ffdf00' },
-  'brazil':         { bg: '#009c3b', color: '#ffdf00' },
-  'france':         { bg: '#002395', color: '#ffffff' },
-  'francia':        { bg: '#002395', color: '#ffffff' },
-  'germany':        { bg: '#333333', color: '#ffcc00' },
-  'alemania':       { bg: '#333333', color: '#ffcc00' },
-  'italy':          { bg: '#009246', color: '#ffffff' },
-  'italia':         { bg: '#009246', color: '#ffffff' },
-  'japan':          { bg: '#bc002d', color: '#ffffff' },
-  'japón':          { bg: '#bc002d', color: '#ffffff' },
-  'china':          { bg: '#de2910', color: '#ffde00' },
-  'uk':             { bg: '#012169', color: '#ffffff' },
-  'united kingdom': { bg: '#012169', color: '#ffffff' },
-  'canada':         { bg: '#d80027', color: '#ffffff' },
-  'canadá':         { bg: '#d80027', color: '#ffffff' },
-  'australia':      { bg: '#003087', color: '#ffffff' },
-  'chile':          { bg: '#d52b1e', color: '#ffffff' },
-  'colombia':       { bg: '#fcd116', color: '#003087' },
-  'peru':           { bg: '#d91023', color: '#ffffff' },
-  'perú':           { bg: '#d91023', color: '#ffffff' },
-  'uruguay':        { bg: '#0038a8', color: '#ffffff' },
-  'paraguay':       { bg: '#d52b1e', color: '#ffffff' },
-  'bolivia':        { bg: '#d52b1e', color: '#f9b40c' },
-  'ecuador':        { bg: '#ffda00', color: '#003580' },
-  'venezuela':      { bg: '#cf142b', color: '#ffffff' },
-  'portugal':       { bg: '#006600', color: '#ffffff' },
-  'russia':         { bg: '#003580', color: '#ffffff' },
-  'rusia':          { bg: '#003580', color: '#ffffff' },
-  'india':          { bg: '#ff9933', color: '#ffffff' },
-  'south korea':    { bg: '#003478', color: '#ffffff' },
-  'corea del sur':  { bg: '#003478', color: '#ffffff' },
-}
-
-const FALLBACK_COUNTRY_PALETTES = [
-  { bg: '#1e3a8a', color: '#ffffff' },
-  { bg: '#065f46', color: '#ffffff' },
-  { bg: '#7c2d12', color: '#ffffff' },
-  { bg: '#4c1d95', color: '#ffffff' },
-  { bg: '#831843', color: '#ffffff' },
-  { bg: '#134e4a', color: '#ffffff' },
-  { bg: '#1e1b4b', color: '#ffffff' },
-  { bg: '#713f12', color: '#ffffff' },
-]
+// ── Category badge ─────────────────────────────────────────────────────────
 
 function hashStr(s: string): number {
   let h = 0
@@ -351,70 +291,26 @@ function hashStr(s: string): number {
   return h
 }
 
-export function CountryBadge({ country }: { country: string }) {
-  if (!country) return <span className="text-muted-foreground">—</span>
-  const style = COUNTRY_COLORS[country.toLowerCase()]
-    ?? FALLBACK_COUNTRY_PALETTES[hashStr(country) % FALLBACK_COUNTRY_PALETTES.length]
-  return (
-    <span
-      className="inline-block px-2 py-0.5 rounded-md text-xs font-medium"
-      style={{ backgroundColor: style.bg, color: style.color }}
-    >
-      {country}
-    </span>
-  )
-}
-
-// ── Category badge ─────────────────────────────────────────────────────────
-
+/* Paleta vintage cerrada — solo tonos tierra, nada de arcoíris */
 const CATEGORY_COLORS: Record<string, { bg: string; color: string }> = {
-  'electrónica':      { bg: '#1d4ed8', color: '#ffffff' },
-  'electronica':      { bg: '#1d4ed8', color: '#ffffff' },
-  'electronics':      { bg: '#1d4ed8', color: '#ffffff' },
-  'alimentación':     { bg: '#16a34a', color: '#ffffff' },
-  'alimentacion':     { bg: '#16a34a', color: '#ffffff' },
-  'food':             { bg: '#16a34a', color: '#ffffff' },
-  'ropa':             { bg: '#ea580c', color: '#ffffff' },
-  'clothing':         { bg: '#ea580c', color: '#ffffff' },
-  'moda':             { bg: '#ea580c', color: '#ffffff' },
-  'libros':           { bg: '#a16207', color: '#ffffff' },
-  'books':            { bg: '#a16207', color: '#ffffff' },
-  'hogar y jardín':   { bg: '#15803d', color: '#ffffff' },
-  'hogar y jardin':   { bg: '#15803d', color: '#ffffff' },
-  'home & garden':    { bg: '#15803d', color: '#ffffff' },
-  'hogar':            { bg: '#15803d', color: '#ffffff' },
-  'música':           { bg: '#7c3aed', color: '#ffffff' },
-  'musica':           { bg: '#7c3aed', color: '#ffffff' },
-  'music':            { bg: '#7c3aed', color: '#ffffff' },
-  'belleza':          { bg: '#db2777', color: '#ffffff' },
-  'beauty':           { bg: '#db2777', color: '#ffffff' },
-  'automóvil':        { bg: '#6b7280', color: '#ffffff' },
-  'automovil':        { bg: '#6b7280', color: '#ffffff' },
-  'automotive':       { bg: '#6b7280', color: '#ffffff' },
-  'autos':            { bg: '#6b7280', color: '#ffffff' },
-  'deporte':          { bg: '#dc2626', color: '#ffffff' },
-  'deportes':         { bg: '#dc2626', color: '#ffffff' },
-  'sports':           { bg: '#dc2626', color: '#ffffff' },
-  'juguetes':         { bg: '#f59e0b', color: '#ffffff' },
-  'toys':             { bg: '#f59e0b', color: '#ffffff' },
-  'tecnología':       { bg: '#0891b2', color: '#ffffff' },
-  'tecnologia':       { bg: '#0891b2', color: '#ffffff' },
-  'technology':       { bg: '#0891b2', color: '#ffffff' },
-  'salud':            { bg: '#0d9488', color: '#ffffff' },
-  'health':           { bg: '#0d9488', color: '#ffffff' },
-  'mascotas':         { bg: '#d97706', color: '#ffffff' },
-  'pets':             { bg: '#d97706', color: '#ffffff' },
+  'almacén':      { bg: '#6B7A3F', color: '#FBF3E7' },
+  'almacen':      { bg: '#6B7A3F', color: '#FBF3E7' },
+  'bebidas':      { bg: '#9C5236', color: '#FBF3E7' },
+  'limpieza':     { bg: '#8A6D4B', color: '#FBF3E7' },
+  'kiosco':       { bg: '#C9962B', color: '#2B2118' },
+  'electro':      { bg: '#5C4433', color: '#FBF3E7' },
+  'indumentaria': { bg: '#7A3B3B', color: '#FBF3E7' },
 }
 
 const FALLBACK_CATEGORY_PALETTES = [
-  { bg: '#6366f1', color: '#ffffff' },
-  { bg: '#8b5cf6', color: '#ffffff' },
-  { bg: '#ec4899', color: '#ffffff' },
-  { bg: '#14b8a6', color: '#ffffff' },
-  { bg: '#f97316', color: '#ffffff' },
-  { bg: '#84cc16', color: '#ffffff' },
-  { bg: '#06b6d4', color: '#ffffff' },
-  { bg: '#a855f7', color: '#ffffff' },
+  { bg: '#8A9A5B', color: '#2B2118' },
+  { bg: '#C08A3E', color: '#2B2118' },
+  { bg: '#9C5236', color: '#FBF3E7' },
+  { bg: '#6B4423', color: '#FBF3E7' },
+  { bg: '#A67B5B', color: '#2B2118' },
+  { bg: '#7A3B3B', color: '#FBF3E7' },
+  { bg: '#5C6B47', color: '#FBF3E7' },
+  { bg: '#B08B3F', color: '#2B2118' },
 ]
 
 export function CategoryBadge({ category }: { category: string | null | undefined }) {

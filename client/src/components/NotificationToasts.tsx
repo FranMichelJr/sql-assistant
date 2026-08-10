@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { ShoppingCart, AlertTriangle, RefreshCw, X } from 'lucide-react'
+import { ShoppingCart, AlertTriangle, RefreshCw, X, Bot, FileText } from 'lucide-react'
 import { useNotifications } from '@/context/NotificationContext'
 import type { NotificationType } from '@/types'
 
@@ -9,23 +9,35 @@ const TYPE_CFG: Record<NotificationType, {
   barCls: string
   label: string
 }> = {
-  new_order: {
+  nueva_venta: {
     icon: <ShoppingCart size={14} />,
-    iconCls: 'text-emerald-400',
-    barCls: 'bg-emerald-400',
-    label: 'Nueva Orden',
+    iconCls: 'text-positive',
+    barCls: 'bg-positive',
+    label: 'Nueva Venta',
   },
-  low_stock: {
+  stock_bajo: {
     icon: <AlertTriangle size={14} />,
-    iconCls: 'text-yellow-400',
-    barCls: 'bg-yellow-400',
+    iconCls: 'text-warning',
+    barCls: 'bg-warning',
     label: 'Stock Bajo',
   },
-  status_change: {
+  cambio_estado: {
     icon: <RefreshCw size={14} />,
-    iconCls: 'text-blue-400',
-    barCls: 'bg-blue-400',
+    iconCls: 'text-primary',
+    barCls: 'bg-primary',
     label: 'Estado',
+  },
+  agent_alert: {
+    icon: <Bot size={14} />,
+    iconCls: 'text-critical',
+    barCls: 'bg-critical',
+    label: 'Agente',
+  },
+  agent_report: {
+    icon: <FileText size={14} />,
+    iconCls: 'text-primary',
+    barCls: 'bg-primary',
+    label: 'Reporte',
   },
 }
 
@@ -36,7 +48,7 @@ export function NotificationToasts() {
     <div className="fixed bottom-5 right-5 z-[200] flex flex-col-reverse gap-2.5 pointer-events-none">
       <AnimatePresence initial={false}>
         {toasts.map(t => {
-          const cfg = TYPE_CFG[t.type] ?? TYPE_CFG.new_order
+          const cfg = TYPE_CFG[t.type] ?? TYPE_CFG.nueva_venta
           return (
             <motion.div
               key={t.id}

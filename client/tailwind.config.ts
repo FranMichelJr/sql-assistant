@@ -35,6 +35,9 @@ const config: Config = {
           DEFAULT:    'hsl(var(--card))',
           foreground: 'hsl(var(--card-foreground))',
         },
+        positive: 'hsl(var(--positive))',
+        warning:  'hsl(var(--warning))',
+        critical: 'hsl(var(--critical))',
       },
       borderRadius: {
         lg: 'var(--radius)',
@@ -42,8 +45,16 @@ const config: Config = {
         sm: 'calc(var(--radius) - 4px)',
       },
       fontFamily: {
-        mono: ['Fira Code', 'Consolas', 'ui-monospace', 'monospace'],
-        sans: ['Fira Sans', 'Inter', 'system-ui', 'sans-serif'],
+        /* Slab de cartel/etiqueta vintage — solo para palabras, nunca para dígitos */
+        serif: ['"Alfa Slab One"', 'ui-serif', 'Georgia', 'serif'],
+        sans: ['Karla', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        /* Números tipo libro contable/máquina de escribir, no código */
+        mono: ['"Courier Prime"', '"Courier New"', 'monospace'],
+      },
+      boxShadow: {
+        stamp: '5px 5px 0 0 hsl(var(--foreground) / 0.1)',
+        'stamp-sm': '3px 3px 0 0 hsl(var(--foreground) / 0.1)',
+        'stamp-primary': '5px 5px 0 0 hsl(var(--primary) / 0.3)',
       },
     },
   },

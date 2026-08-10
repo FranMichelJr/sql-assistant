@@ -1,6 +1,7 @@
 import type {
-  Category, Product, Customer, Order, OrderDetail, DashboardMetrics,
-  StockMovement, SalesReport, ProductReport, NewOrderItem,
+  Categoria, Producto, Cliente, Venta, VentaDetail, DashboardMetrics,
+  MovimientoStock, SalesReport, ProductReport, NewVentaItem, Gasto,
+  AgentMessage, AgentReportSummary, AgentReportDetail,
 } from '@/types'
 
 const BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
@@ -34,61 +35,76 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  categories: {
-    list: () => req<Category[]>('/api/categories'),
-    create: (d: Omit<Category, 'id'>) =>
-      req<Category>('/api/categories', { method: 'POST', body: JSON.stringify(d) }),
-    update: (id: number, d: Partial<Category>) =>
-      req<{ ok: boolean }>(`/api/categories/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
+  categorias: {
+    list: () => req<Categoria[]>('/api/categorias'),
+    create: (d: Omit<Categoria, 'id'>) =>
+      req<Categoria>('/api/categorias', { method: 'POST', body: JSON.stringify(d) }),
+    update: (id: number, d: Partial<Categoria>) =>
+      req<{ ok: boolean }>(`/api/categorias/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
     remove: (id: number) =>
-      req<{ ok: boolean }>(`/api/categories/${id}`, { method: 'DELETE' }),
+      req<{ ok: boolean }>(`/api/categorias/${id}`, { method: 'DELETE' }),
   },
-  products: {
-    list: () => req<Product[]>('/api/products'),
-    create: (d: Omit<Product, 'id' | 'category_name'>) =>
-      req<Product>('/api/products', { method: 'POST', body: JSON.stringify(d) }),
-    update: (id: number, d: Partial<Omit<Product, 'category_name'>>) =>
-      req<{ ok: boolean }>(`/api/products/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
+  productos: {
+    list: () => req<Producto[]>('/api/productos'),
+    create: (d: Omit<Producto, 'id' | 'categoria_nombre'>) =>
+      req<Producto>('/api/productos', { method: 'POST', body: JSON.stringify(d) }),
+    update: (id: number, d: Partial<Omit<Producto, 'categoria_nombre'>>) =>
+      req<{ ok: boolean }>(`/api/productos/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
     remove: (id: number) =>
-      req<{ ok: boolean }>(`/api/products/${id}`, { method: 'DELETE' }),
-    movements: (id: number) =>
-      req<StockMovement[]>(`/api/products/${id}/movements`),
-    addMovement: (id: number, d: { type: string; quantity: number; notes: string }) =>
-      req<{ id: number; new_stock: number }>(`/api/products/${id}/movements`, {
+      req<{ ok: boolean }>(`/api/productos/${id}`, { method: 'DELETE' }),
+    movimientos: (id: number) =>
+      req<MovimientoStock[]>(`/api/productos/${id}/movimientos`),
+    addMovimiento: (id: number, d: { tipo: string; cantidad: number; notas: string }) =>
+      req<{ id: number; new_stock: number }>(`/api/productos/${id}/movimientos`, {
         method: 'POST', body: JSON.stringify(d),
       }),
   },
-  customers: {
-    list: () => req<Customer[]>('/api/customers'),
-    create: (d: Omit<Customer, 'id' | 'created_at'>) =>
-      req<Customer>('/api/customers', { method: 'POST', body: JSON.stringify(d) }),
-    update: (id: number, d: Partial<Customer>) =>
-      req<{ ok: boolean }>(`/api/customers/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
+  clientes: {
+    list: () => req<Cliente[]>('/api/clientes'),
+    create: (d: Omit<Cliente, 'id' | 'created_at'>) =>
+      req<Cliente>('/api/clientes', { method: 'POST', body: JSON.stringify(d) }),
+    update: (id: number, d: Partial<Cliente>) =>
+      req<{ ok: boolean }>(`/api/clientes/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
     remove: (id: number) =>
-      req<{ ok: boolean }>(`/api/customers/${id}`, { method: 'DELETE' }),
+      req<{ ok: boolean }>(`/api/clientes/${id}`, { method: 'DELETE' }),
   },
-  orders: {
-    list: () => req<Order[]>('/api/orders'),
-    detail: (id: number) => req<OrderDetail>(`/api/orders/${id}`),
-    create: (d: { customer_id: number; items: NewOrderItem[] }) =>
-      req<Order>('/api/orders', { method: 'POST', body: JSON.stringify(d) }),
-    update: (id: number, d: Partial<Order>) =>
-      req<{ ok: boolean }>(`/api/orders/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
+  ventas: {
+    list: () => req<Venta[]>('/api/ventas'),
+    detail: (id: number) => req<VentaDetail>(`/api/ventas/${id}`),
+    create: (d: { cliente_id: number | null; canal: string; items: NewVentaItem[] }) =>
+      req<Venta>('/api/ventas', { method: 'POST', body: JSON.stringify(d) }),
+    update: (id: number, d: Partial<Venta>) =>
+      req<{ ok: boolean }>(`/api/ventas/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
     remove: (id: number) =>
-      req<{ ok: boolean }>(`/api/orders/${id}`, { method: 'DELETE' }),
+      req<{ ok: boolean }>(`/api/ventas/${id}`, { method: 'DELETE' }),
   },
-  auth: {
-    changePassword: (current_password: string, new_password: string) =>
-      req<{ ok: boolean }>('/api/change-password', {
-        method: 'POST',
-        body: JSON.stringify({ current_password, new_password }),
-      }),
+  gastos: {
+    list: () => req<Gasto[]>('/api/gastos'),
+    create: (d: { categoria: string; descripcion: string; monto: number }) =>
+      req<Gasto>('/api/gastos', { method: 'POST', body: JSON.stringify(d) }),
+    update: (id: number, d: Partial<{ categoria: string; descripcion: string; monto: number }>) =>
+      req<{ ok: boolean }>(`/api/gastos/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
+    remove: (id: number) =>
+      req<{ ok: boolean }>(`/api/gastos/${id}`, { method: 'DELETE' }),
   },
   dashboard: {
     get: () => req<DashboardMetrics>('/api/dashboard'),
   },
   reports: {
-    sales: (period: string) => req<SalesReport>(`/api/reports/sales?period=${period}`),
-    products: () => req<ProductReport[]>('/api/reports/products'),
+    ventas: (period: string) => req<SalesReport>(`/api/reports/ventas?period=${period}`),
+    productos: () => req<ProductReport[]>('/api/reports/productos'),
+  },
+  query: (question: string) =>
+    req<{ success: boolean; sql: string | null; columns?: string[]; rows?: unknown[][]; row_count?: number; error?: string }>(
+      '/api/query', { method: 'POST', body: JSON.stringify({ question }) },
+    ),
+  agent: {
+    messages: () => req<AgentMessage[]>('/api/agent/messages'),
+    chat: (message: string) =>
+      req<AgentMessage>('/api/agent/chat', { method: 'POST', body: JSON.stringify({ message }) }),
+    reports: () => req<AgentReportSummary[]>('/api/agent/reports'),
+    report: (id: number) => req<AgentReportDetail>(`/api/agent/reports/${id}`),
+    runNow: () => req<{ anomalies: number; message?: string }>('/api/agent/run-now', { method: 'POST' }),
+    generateReport: () => req<{ report_id: number; title: string }>('/api/agent/generate-report', { method: 'POST' }),
   },
 }

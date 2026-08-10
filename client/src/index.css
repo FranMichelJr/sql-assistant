@@ -3,71 +3,60 @@
 @tailwind utilities;
 
 @layer base {
-  :root {
-    --background:           210 20% 98%;
-    --foreground:           232 36% 10%;
-    --card:                 0 0% 100%;
-    --card-foreground:      232 36% 10%;
-    --popover:              0 0% 100%;
-    --popover-foreground:   232 36% 10%;
-    --primary:              188 86% 36%;
-    --primary-foreground:   0 0% 100%;
-    --secondary:            210 20% 92%;
-    --secondary-foreground: 232 36% 10%;
-    --muted:                210 20% 94%;
-    --muted-foreground:     215 16% 46%;
-    --accent:               210 20% 90%;
-    --accent-foreground:    232 36% 10%;
-    --destructive:          0 72% 55%;
-    --destructive-foreground: 0 0% 100%;
-    --border:               210 20% 88%;
-    --input:                210 20% 94%;
-    --ring:                 188 86% 36%;
-    --radius:               0.625rem;
+  /* ByMes — "bitácora de negocio": papel cálido, tinta terracota, nada de
+     dashboards fríos. Claro es la identidad por defecto del producto. */
+  :root, .light {
+    --background:            42 42% 93%;
+    --foreground:            22 30% 14%;
+    --card:                  38 48% 97%;
+    --card-foreground:       22 30% 14%;
+    --popover:               38 48% 97%;
+    --popover-foreground:    22 30% 14%;
+    --primary:               16 68% 43%;
+    --primary-foreground:    40 45% 98%;
+    --secondary:             36 32% 88%;
+    --secondary-foreground:  22 30% 14%;
+    --muted:                 37 28% 89%;
+    --muted-foreground:      28 14% 40%;
+    --accent:                36 34% 86%;
+    --accent-foreground:     22 30% 14%;
+    --destructive:           6 62% 40%;
+    --destructive-foreground: 40 45% 98%;
+    --border:                34 24% 80%;
+    --input:                 34 24% 90%;
+    --ring:                  16 68% 43%;
+    --radius:                1.1rem;
+
+    --positive:              82 32% 28%;
+    --warning:               38 78% 42%;
+    --critical:              6 62% 40%;
   }
 
-  .light {
-    --background:           210 20% 98%;
-    --foreground:           232 36% 10%;
-    --card:                 0 0% 100%;
-    --card-foreground:      232 36% 10%;
-    --popover:              0 0% 100%;
-    --popover-foreground:   232 36% 10%;
-    --primary:              188 86% 36%;
-    --primary-foreground:   0 0% 100%;
-    --secondary:            210 20% 92%;
-    --secondary-foreground: 232 36% 10%;
-    --muted:                210 20% 94%;
-    --muted-foreground:     215 16% 46%;
-    --accent:               210 20% 90%;
-    --accent-foreground:    232 36% 10%;
-    --destructive:          0 72% 55%;
-    --destructive-foreground: 0 0% 100%;
-    --border:               210 20% 88%;
-    --input:                210 20% 94%;
-    --ring:                 188 86% 36%;
-  }
-
+  /* Dark — "espresso", no azul. Mismo carácter cálido, tono invertido. */
   .dark {
-    --background:           232 36% 4%;
-    --foreground:           210 40% 92%;
-    --card:                 231 36% 8%;
-    --card-foreground:      210 40% 92%;
-    --popover:              231 36% 8%;
-    --popover-foreground:   210 40% 92%;
-    --primary:              188 86% 53%;
-    --primary-foreground:   232 36% 4%;
-    --secondary:            232 34% 12%;
-    --secondary-foreground: 210 40% 92%;
-    --muted:                232 34% 11%;
-    --muted-foreground:     215 16% 42%;
-    --accent:               232 34% 13%;
-    --accent-foreground:    210 40% 92%;
-    --destructive:          0 72% 61%;
-    --destructive-foreground: 210 40% 92%;
-    --border:               231 34% 15%;
-    --input:                232 34% 11%;
-    --ring:                 188 86% 53%;
+    --background:            24 28% 8%;
+    --foreground:            38 32% 92%;
+    --card:                  24 24% 11%;
+    --card-foreground:       38 32% 92%;
+    --popover:               24 24% 11%;
+    --popover-foreground:    38 32% 92%;
+    --primary:               18 78% 58%;
+    --primary-foreground:    24 30% 10%;
+    --secondary:             24 20% 16%;
+    --secondary-foreground:  38 32% 92%;
+    --muted:                 24 18% 15%;
+    --muted-foreground:      32 14% 64%;
+    --accent:                24 20% 17%;
+    --accent-foreground:     38 32% 92%;
+    --destructive:           6 70% 56%;
+    --destructive-foreground: 38 32% 92%;
+    --border:                24 18% 20%;
+    --input:                 24 18% 15%;
+    --ring:                  18 78% 58%;
+
+    --positive:              82 34% 42%;
+    --warning:               38 80% 56%;
+    --critical:              6 70% 56%;
   }
 
   html { @apply h-full; }
@@ -78,8 +67,16 @@
 /* Smooth theme transitions */
 *, *::before, *::after {
   transition-property: background-color, border-color, color, fill, stroke;
-  transition-duration: 0.25s;
+  transition-duration: 0.2s;
   transition-timing-function: ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
 }
 
 @layer components {
@@ -96,17 +93,21 @@
   .scrollbar-thin::-webkit-scrollbar-thumb:hover {
     background: hsl(var(--primary) / 0.3);
   }
+
+  .bg-grid {
+    background-image:
+      radial-gradient(hsl(var(--foreground) / 0.12) 1px, transparent 1px);
+    background-size: 22px 22px;
+  }
+
+  .paper-texture {
+    background-image:
+      repeating-linear-gradient(0deg, hsl(var(--foreground) / 0.015) 0px, transparent 1px, transparent 2px);
+  }
 }
 
 .syntax-wrapper pre {
   background: hsl(var(--card)) !important;
   margin: 0 !important;
   border-radius: 0 !important;
-}
-
-.lab-bg::before {
-  overflow: hidden;
-  max-width: 100vw;
-  max-height: 100vh;
-  box-sizing: border-box;
 }

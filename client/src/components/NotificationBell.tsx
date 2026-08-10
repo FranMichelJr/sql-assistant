@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Bell, ShoppingCart, AlertTriangle, RefreshCw, CheckCheck, PackageSearch } from 'lucide-react'
+import { Bell, ShoppingCart, AlertTriangle, RefreshCw, CheckCheck, PackageSearch, Bot, FileText } from 'lucide-react'
 import { useNotifications } from '@/context/NotificationContext'
 import type { AppNotification, NotificationType } from '@/types'
 
@@ -12,23 +12,35 @@ const TYPE_CFG: Record<NotificationType, {
   bgCls: string
   barCls: string
 }> = {
-  new_order: {
+  nueva_venta: {
     icon: <ShoppingCart size={13} />,
-    iconCls: 'text-emerald-400',
-    bgCls: 'bg-emerald-500/10 border-emerald-500/25',
-    barCls: 'bg-emerald-400',
+    iconCls: 'text-positive',
+    bgCls: 'bg-positive/10 border-positive/25',
+    barCls: 'bg-positive',
   },
-  low_stock: {
+  stock_bajo: {
     icon: <AlertTriangle size={13} />,
-    iconCls: 'text-yellow-400',
-    bgCls: 'bg-yellow-500/10 border-yellow-500/25',
-    barCls: 'bg-yellow-400',
+    iconCls: 'text-warning',
+    bgCls: 'bg-warning/10 border-warning/25',
+    barCls: 'bg-warning',
   },
-  status_change: {
+  cambio_estado: {
     icon: <RefreshCw size={13} />,
-    iconCls: 'text-blue-400',
-    bgCls: 'bg-blue-500/10 border-blue-500/25',
-    barCls: 'bg-blue-400',
+    iconCls: 'text-primary',
+    bgCls: 'bg-primary/10 border-primary/25',
+    barCls: 'bg-primary',
+  },
+  agent_alert: {
+    icon: <Bot size={13} />,
+    iconCls: 'text-critical',
+    bgCls: 'bg-critical/10 border-critical/25',
+    barCls: 'bg-critical',
+  },
+  agent_report: {
+    icon: <FileText size={13} />,
+    iconCls: 'text-primary',
+    bgCls: 'bg-primary/10 border-primary/25',
+    barCls: 'bg-primary',
   },
 }
 
@@ -48,7 +60,7 @@ function timeAgo(iso: string): string {
 // ── Single notification row ───────────────────────────────────────────────
 
 function NotifRow({ n, onRead }: { n: AppNotification; onRead: () => void }) {
-  const cfg = TYPE_CFG[n.type] ?? TYPE_CFG.new_order
+  const cfg = TYPE_CFG[n.type] ?? TYPE_CFG.nueva_venta
   return (
     <motion.button
       type="button"
@@ -154,8 +166,8 @@ export function NotificationBell() {
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
               exit={{ scale: 0 }}
-              className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 rounded-full bg-red-500
-                text-white text-[9px] font-bold flex items-center justify-center px-0.5 pointer-events-none"
+              className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 rounded-full bg-critical
+                text-primary-foreground text-[9px] font-bold flex items-center justify-center px-0.5 pointer-events-none"
             >
               {unreadCount > 9 ? '9+' : unreadCount}
             </motion.span>
@@ -181,7 +193,7 @@ export function NotificationBell() {
                 <span className="text-sm font-semibold text-foreground">Notificaciones</span>
                 {unreadCount > 0 && (
                   <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold
-                    bg-red-500/15 text-red-400 border border-red-500/20 leading-none">
+                    bg-critical/15 text-critical border border-critical/20 leading-none">
                     {unreadCount}
                   </span>
                 )}

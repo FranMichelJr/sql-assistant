@@ -1,5 +1,7 @@
 """
-Flask backend para SQL Assistant con autenticación JWT y notificaciones en tiempo real.
+Backend Flask de ByMes — agente de BI conversacional para PyMEs argentinas.
+Autenticación JWT, notificaciones en tiempo real vía Socket.IO, CRUD del
+negocio (ventas, productos, clientes, gastos) y el agente autónomo (agent.py).
 """
 import os
 import json
@@ -14,6 +16,8 @@ from flask_cors import CORS
 from flask_socketio import SocketIO
 from werkzeug.security import generate_password_hash, check_password_hash
 
+import agent
+
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "socketio-dev-secret")
 CORS(app, origins="*")
@@ -25,55 +29,51 @@ socketio = SocketIO(
     engineio_logger=False,
 )
 
-DB_PATH = "ecommerce.db"
-JWT_SECRET = os.environ.get("JWT_SECRET", "sql-assistant-dev-secret-2024")
+DB_PATH = "bymes.db"
+JWT_SECRET = os.environ.get("JWT_SECRET", "bymes-dev-secret-2026")
 JWT_EXPIRY_HOURS = 8
 
 # ── Usuarios hardcodeados ──────────────────────────────────────────────────
 
 USERS = {
-    "admin@sql.com":    {"hash": generate_password_hash("admin123"),    "role": "admin",       "name": "Admin"},
-    "vendedor@sql.com": {"hash": generate_password_hash("vendedor123"), "role": "vendedor",    "name": "Vendedor"},
-    "bodega@sql.com":   {"hash": generate_password_hash("bodega123"),   "role": "bodega",      "name": "Bodega"},
-    "demo@sql.com":     {"hash": generate_password_hash("demo123"),     "role": "espectador",  "name": "Demo"},
-}
-
-ROLE_ROUTES = {
-    "admin":      {"dashboard", "query", "products", "customers", "orders", "categories", "lowstock"},
-    "vendedor":   {"dashboard", "orders", "customers"},
-    "bodega":     {"products", "categories", "lowstock"},
-    "espectador": {"dashboard", "query", "products", "customers", "orders"},
+    "franmicheljr@gmail.com": {"hash": generate_password_hash("Junior22"),     "role": "dueno", "name": "Francisco"},
+    "demo@bymes.ar":          {"hash": generate_password_hash("ByMesDemo26!"), "role": "demo",  "name": "Demo"},
 }
 
 DB_SCHEMA = """
-Esquema de la base de datos de e-commerce:
+Esquema de la base de datos de una PyME argentina (almacén/distribuidora):
 
-TABLE categories:
-  id INTEGER PK, name TEXT, description TEXT
+TABLE categorias:
+  id INTEGER PK, nombre TEXT, descripcion TEXT
 
-TABLE customers:
-  id INTEGER PK, first_name TEXT, last_name TEXT, email TEXT UNIQUE,
-  phone TEXT, city TEXT, country TEXT, created_at TEXT (ISO datetime)
+TABLE productos:
+  id INTEGER PK, nombre TEXT, categoria_id INTEGER FK->categorias.id,
+  precio REAL, costo REAL, stock INTEGER, stock_minimo INTEGER, descripcion TEXT
 
-TABLE products:
-  id INTEGER PK, name TEXT, category_id INTEGER FK->categories.id,
-  price REAL, stock INTEGER, description TEXT
+TABLE clientes:
+  id INTEGER PK, nombre TEXT, telefono TEXT, email TEXT, created_at TEXT (ISO datetime)
 
-TABLE orders:
-  id INTEGER PK, customer_id INTEGER FK->customers.id,
-  status TEXT (pending|processing|shipped|delivered|cancelled),
+TABLE ventas:
+  id INTEGER PK, cliente_id INTEGER FK->clientes.id,
+  canal TEXT (mostrador|whatsapp|mercado_libre|reparto),
+  estado TEXT (completada|pendiente|cancelada),
   total REAL, created_at TEXT (ISO datetime)
 
-TABLE order_items:
-  id INTEGER PK, order_id INTEGER FK->orders.id,
-  product_id INTEGER FK->products.id,
-  quantity INTEGER, unit_price REAL
+TABLE venta_items:
+  id INTEGER PK, venta_id INTEGER FK->ventas.id,
+  producto_id INTEGER FK->productos.id,
+  cantidad INTEGER, precio_unitario REAL
+
+TABLE gastos:
+  id INTEGER PK, categoria TEXT (Alquiler|Sueldos|Servicios|Impuestos|Insumos|Otros),
+  descripcion TEXT, monto REAL, created_at TEXT (ISO datetime)
 
 Relaciones clave:
-- Un customer puede tener muchos orders
-- Un order puede tener muchos order_items
-- Cada order_item pertenece a un product
-- Cada product pertenece a una category
+- Un cliente puede tener muchas ventas
+- Una venta puede tener muchos venta_items
+- Cada venta_item pertenece a un producto
+- Cada producto pertenece a una categoria
+- El margen de una venta es SUM((precio_unitario - productos.costo) * cantidad)
 """
 
 SYSTEM_PROMPT = f"""Eres un experto en SQL que convierte preguntas en lenguaje natural
@@ -84,12 +84,11 @@ a consultas SQLite válidas y eficientes.
 Reglas ESTRICTAS:
 1. Responde ÚNICAMENTE con la consulta SQL, sin explicaciones, sin markdown, sin bloques de código.
 2. Usa SQLite syntax (no MySQL ni PostgreSQL).
-3. Concatena nombres con: first_name || ' ' || last_name
-4. Para fechas usa: strftime('%Y-%m-%d', created_at)
-5. Limita resultados a 50 filas por defecto con LIMIT 50 si no se especifica.
-6. Si la pregunta es ambigua, infiere la consulta más razonable.
-7. Solo genera SELECT statements. Nunca INSERT, UPDATE, DELETE ni DDL.
-8. Si no puedes generar un SQL válido, devuelve exactamente: ERROR: <motivo>
+3. Para fechas usa: strftime('%Y-%m-%d', created_at)
+4. Limita resultados a 50 filas por defecto con LIMIT 50 si no se especifica.
+5. Si la pregunta es ambigua, infiere la consulta más razonable.
+6. Solo genera SELECT statements. Nunca INSERT, UPDATE, DELETE ni DDL.
+7. Si no puedes generar un SQL válido, devuelve exactamente: ERROR: <motivo>
 """
 
 _anthropic_client = None
@@ -130,16 +129,17 @@ def natural_to_sql(question: str) -> str:
 
 
 def ensure_tables():
+    """Crea tablas que pueden faltar en una base de datos existente (idempotente)."""
     if not os.path.exists(DB_PATH):
         return
     conn = sqlite3.connect(DB_PATH)
     conn.execute("""
-        CREATE TABLE IF NOT EXISTS stock_movements (
+        CREATE TABLE IF NOT EXISTS movimientos_stock (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            product_id INTEGER NOT NULL,
-            type TEXT NOT NULL,
-            quantity INTEGER NOT NULL,
-            notes TEXT DEFAULT '',
+            producto_id INTEGER NOT NULL,
+            tipo TEXT NOT NULL,
+            cantidad INTEGER NOT NULL,
+            notas TEXT DEFAULT '',
             user_email TEXT DEFAULT '',
             created_at TEXT NOT NULL
         )
@@ -152,6 +152,26 @@ def ensure_tables():
             message TEXT NOT NULL,
             data TEXT DEFAULT '{}',
             read INTEGER DEFAULT 0,
+            created_at TEXT NOT NULL
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS agent_reports (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            period_start TEXT NOT NULL,
+            period_end TEXT NOT NULL,
+            title TEXT NOT NULL,
+            summary_md TEXT NOT NULL,
+            kpis_json TEXT DEFAULT '{}',
+            created_at TEXT NOT NULL
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS agent_messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            role TEXT NOT NULL,
+            content TEXT NOT NULL,
+            related_notification_id INTEGER,
             created_at TEXT NOT NULL
         )
     """)
@@ -176,9 +196,9 @@ def execute_query(sql: str) -> tuple[list[list], list[str]]:
 
 # ── Notifications helper ───────────────────────────────────────────────────
 
-def push_notification(notif_type: str, title: str, message: str, data: dict | None = None) -> None:
+def push_notification(notif_type: str, title: str, message: str, data: dict | None = None) -> int | None:
     if not os.path.exists(DB_PATH):
-        return
+        return None
     try:
         conn = sqlite3.connect(DB_PATH)
         now = datetime.datetime.utcnow().isoformat()
@@ -199,8 +219,9 @@ def push_notification(notif_type: str, title: str, message: str, data: dict | No
             "created_at": now,
         }
         socketio.emit("notification", notif)
+        return notif_id
     except Exception:
-        pass
+        return None
 
 
 # ── JWT helpers ────────────────────────────────────────────────────────────
@@ -256,22 +277,6 @@ def login():
     })
 
 
-@app.route("/api/change-password", methods=["POST"])
-@require_auth()
-def change_password():
-    data = request.get_json(silent=True) or {}
-    current = data.get("current_password") or ""
-    new_pw  = data.get("new_password") or ""
-    email   = request.current_user.get("email", "")
-    user    = USERS.get(email)
-    if not user or not check_password_hash(user["hash"], current):
-        return jsonify({"error": "Contraseña actual incorrecta"}), 400
-    if len(new_pw) < 6:
-        return jsonify({"error": "La nueva contraseña debe tener al menos 6 caracteres"}), 400
-    USERS[email]["hash"] = generate_password_hash(new_pw)
-    return jsonify({"ok": True})
-
-
 # ── Endpoints ──────────────────────────────────────────────────────────────
 
 @app.route('/')
@@ -290,13 +295,13 @@ def health():
 
 
 @app.route("/api/schema", methods=["GET"])
-@require_auth(roles=["admin"])
+@require_auth(roles=["dueno"])
 def get_schema():
     return jsonify({"schema": DB_SCHEMA})
 
 
 @app.route("/api/query", methods=["POST"])
-@require_auth(roles=["admin", "espectador"])
+@require_auth(roles=["dueno"])
 def query():
     data = request.get_json(silent=True) or {}
     question = (data.get("question") or "").strip()
@@ -351,339 +356,374 @@ def db_run(sql: str, params: tuple = ()) -> int:
         conn.close()
 
 
-# ── Categories ─────────────────────────────────────────────────────────────
+# ── Categorías ─────────────────────────────────────────────────────────────
 
-@app.route("/api/categories", methods=["GET"])
-@require_auth(roles=["admin", "bodega", "espectador"])
-def list_categories():
-    return jsonify(db_all("SELECT * FROM categories ORDER BY name"))
+@app.route("/api/categorias", methods=["GET"])
+@require_auth(roles=["dueno", "encargado", "demo"])
+def list_categorias():
+    return jsonify(db_all("SELECT * FROM categorias ORDER BY nombre"))
 
 
-@app.route("/api/categories", methods=["POST"])
-@require_auth(roles=["admin", "bodega"])
-def create_category():
+@app.route("/api/categorias", methods=["POST"])
+@require_auth(roles=["dueno", "encargado"])
+def create_categoria():
     d = request.get_json(silent=True) or {}
-    name = (d.get("name") or "").strip()
-    if not name:
-        return jsonify({"error": "name requerido"}), 400
-    desc = (d.get("description") or "").strip()
-    row_id = db_run("INSERT INTO categories (name, description) VALUES (?, ?)", (name, desc))
-    return jsonify({"id": row_id, "name": name, "description": desc}), 201
+    nombre = (d.get("nombre") or "").strip()
+    if not nombre:
+        return jsonify({"error": "nombre requerido"}), 400
+    desc = (d.get("descripcion") or "").strip()
+    row_id = db_run("INSERT INTO categorias (nombre, descripcion) VALUES (?, ?)", (nombre, desc))
+    return jsonify({"id": row_id, "nombre": nombre, "descripcion": desc}), 201
 
 
-@app.route("/api/categories/<int:cid>", methods=["PUT"])
-@require_auth(roles=["admin", "bodega"])
-def update_category(cid: int):
+@app.route("/api/categorias/<int:cid>", methods=["PUT"])
+@require_auth(roles=["dueno", "encargado"])
+def update_categoria(cid: int):
     d = request.get_json(silent=True) or {}
-    db_run("UPDATE categories SET name=?, description=? WHERE id=?",
-           ((d.get("name") or "").strip(), (d.get("description") or "").strip(), cid))
+    db_run("UPDATE categorias SET nombre=?, descripcion=? WHERE id=?",
+           ((d.get("nombre") or "").strip(), (d.get("descripcion") or "").strip(), cid))
     return jsonify({"ok": True})
 
 
-@app.route("/api/categories/<int:cid>", methods=["DELETE"])
-@require_auth(roles=["admin"])
-def delete_category(cid: int):
-    db_run("DELETE FROM categories WHERE id=?", (cid,))
+@app.route("/api/categorias/<int:cid>", methods=["DELETE"])
+@require_auth(roles=["dueno"])
+def delete_categoria(cid: int):
+    db_run("DELETE FROM categorias WHERE id=?", (cid,))
     return jsonify({"ok": True})
 
 
-# ── Products ───────────────────────────────────────────────────────────────
+# ── Productos ──────────────────────────────────────────────────────────────
 
-@app.route("/api/products", methods=["GET"])
-@require_auth(roles=["admin", "bodega", "espectador"])
-def list_products():
+@app.route("/api/productos", methods=["GET"])
+@require_auth(roles=["dueno", "encargado", "demo"])
+def list_productos():
     rows = db_all("""
-        SELECT p.*, c.name AS category_name
-        FROM products p
-        LEFT JOIN categories c ON p.category_id = c.id
-        ORDER BY p.name
+        SELECT p.*, c.nombre AS categoria_nombre
+        FROM productos p
+        LEFT JOIN categorias c ON p.categoria_id = c.id
+        ORDER BY p.nombre
     """)
     return jsonify(rows)
 
 
-@app.route("/api/products", methods=["POST"])
-@require_auth(roles=["admin", "bodega"])
-def create_product():
+@app.route("/api/productos", methods=["POST"])
+@require_auth(roles=["dueno", "encargado"])
+def create_producto():
     d = request.get_json(silent=True) or {}
-    name = (d.get("name") or "").strip()
-    if not name:
-        return jsonify({"error": "name requerido"}), 400
+    nombre = (d.get("nombre") or "").strip()
+    if not nombre:
+        return jsonify({"error": "nombre requerido"}), 400
     row_id = db_run(
-        "INSERT INTO products (name, category_id, price, stock, description) VALUES (?,?,?,?,?)",
-        (name, d.get("category_id") or None, float(d.get("price") or 0),
-         int(d.get("stock") or 0), (d.get("description") or "").strip()),
+        "INSERT INTO productos (nombre, categoria_id, precio, costo, stock, stock_minimo, descripcion) VALUES (?,?,?,?,?,?,?)",
+        (nombre, d.get("categoria_id") or None, float(d.get("precio") or 0), float(d.get("costo") or 0),
+         int(d.get("stock") or 0), int(d.get("stock_minimo") or 5), (d.get("descripcion") or "").strip()),
     )
-    return jsonify({"id": row_id, **{k: d.get(k) for k in ("name","category_id","price","stock","description")}}), 201
+    return jsonify({"id": row_id, **{k: d.get(k) for k in
+                    ("nombre", "categoria_id", "precio", "costo", "stock", "stock_minimo", "descripcion")}}), 201
 
 
-@app.route("/api/products/<int:pid>", methods=["PUT"])
-@require_auth(roles=["admin", "bodega"])
-def update_product(pid: int):
+@app.route("/api/productos/<int:pid>", methods=["PUT"])
+@require_auth(roles=["dueno", "encargado"])
+def update_producto(pid: int):
     d = request.get_json(silent=True) or {}
     db_run(
-        "UPDATE products SET name=?, category_id=?, price=?, stock=?, description=? WHERE id=?",
-        ((d.get("name") or "").strip(), d.get("category_id") or None,
-         float(d.get("price") or 0), int(d.get("stock") or 0),
-         (d.get("description") or "").strip(), pid),
+        "UPDATE productos SET nombre=?, categoria_id=?, precio=?, costo=?, stock=?, stock_minimo=?, descripcion=? WHERE id=?",
+        ((d.get("nombre") or "").strip(), d.get("categoria_id") or None,
+         float(d.get("precio") or 0), float(d.get("costo") or 0), int(d.get("stock") or 0),
+         int(d.get("stock_minimo") or 5), (d.get("descripcion") or "").strip(), pid),
     )
     return jsonify({"ok": True})
 
 
-@app.route("/api/products/<int:pid>", methods=["DELETE"])
-@require_auth(roles=["admin", "bodega"])
-def delete_product(pid: int):
-    db_run("DELETE FROM products WHERE id=?", (pid,))
+@app.route("/api/productos/<int:pid>", methods=["DELETE"])
+@require_auth(roles=["dueno"])
+def delete_producto(pid: int):
+    db_run("DELETE FROM productos WHERE id=?", (pid,))
     return jsonify({"ok": True})
 
 
-# ── Customers ──────────────────────────────────────────────────────────────
+# ── Clientes ───────────────────────────────────────────────────────────────
 
-@app.route("/api/customers", methods=["GET"])
-@require_auth(roles=["admin", "vendedor", "espectador"])
-def list_customers():
-    return jsonify(db_all("SELECT * FROM customers ORDER BY first_name, last_name"))
+@app.route("/api/clientes", methods=["GET"])
+@require_auth(roles=["dueno", "encargado", "demo"])
+def list_clientes():
+    return jsonify(db_all("SELECT * FROM clientes ORDER BY nombre"))
 
 
-@app.route("/api/customers", methods=["POST"])
-@require_auth(roles=["admin", "vendedor"])
-def create_customer():
+@app.route("/api/clientes", methods=["POST"])
+@require_auth(roles=["dueno", "encargado"])
+def create_cliente():
     d = request.get_json(silent=True) or {}
-    first = (d.get("first_name") or "").strip()
-    if not first:
-        return jsonify({"error": "first_name requerido"}), 400
+    nombre = (d.get("nombre") or "").strip()
+    if not nombre:
+        return jsonify({"error": "nombre requerido"}), 400
     now = datetime.datetime.utcnow().isoformat()
     row_id = db_run(
-        "INSERT INTO customers (first_name, last_name, email, phone, city, country, created_at) VALUES (?,?,?,?,?,?,?)",
-        (first, (d.get("last_name") or "").strip(), (d.get("email") or "").strip(),
-         (d.get("phone") or "").strip(), (d.get("city") or "").strip(),
-         (d.get("country") or "").strip(), now),
+        "INSERT INTO clientes (nombre, telefono, email, created_at) VALUES (?,?,?,?)",
+        (nombre, (d.get("telefono") or "").strip(), (d.get("email") or "").strip(), now),
     )
-    return jsonify({"id": row_id, **{k: d.get(k, "") for k in
-                    ("first_name","last_name","email","phone","city","country")},
-                    "created_at": now}), 201
+    return jsonify({"id": row_id, "nombre": nombre, "telefono": d.get("telefono", ""),
+                    "email": d.get("email", ""), "created_at": now}), 201
 
 
-@app.route("/api/customers/<int:cid>", methods=["PUT"])
-@require_auth(roles=["admin", "vendedor"])
-def update_customer(cid: int):
+@app.route("/api/clientes/<int:cid>", methods=["PUT"])
+@require_auth(roles=["dueno", "encargado"])
+def update_cliente(cid: int):
     d = request.get_json(silent=True) or {}
     db_run(
-        "UPDATE customers SET first_name=?, last_name=?, email=?, phone=?, city=?, country=? WHERE id=?",
-        ((d.get("first_name") or "").strip(), (d.get("last_name") or "").strip(),
-         (d.get("email") or "").strip(), (d.get("phone") or "").strip(),
-         (d.get("city") or "").strip(), (d.get("country") or "").strip(), cid),
+        "UPDATE clientes SET nombre=?, telefono=?, email=? WHERE id=?",
+        ((d.get("nombre") or "").strip(), (d.get("telefono") or "").strip(),
+         (d.get("email") or "").strip(), cid),
     )
     return jsonify({"ok": True})
 
 
-@app.route("/api/customers/<int:cid>", methods=["DELETE"])
-@require_auth(roles=["admin"])
-def delete_customer(cid: int):
-    db_run("DELETE FROM customers WHERE id=?", (cid,))
+@app.route("/api/clientes/<int:cid>", methods=["DELETE"])
+@require_auth(roles=["dueno"])
+def delete_cliente(cid: int):
+    db_run("DELETE FROM clientes WHERE id=?", (cid,))
     return jsonify({"ok": True})
 
 
-# ── Orders ─────────────────────────────────────────────────────────────────
+# ── Ventas ─────────────────────────────────────────────────────────────────
 
-@app.route("/api/orders", methods=["GET"])
-@require_auth(roles=["admin", "vendedor", "espectador"])
-def list_orders():
+@app.route("/api/ventas", methods=["GET"])
+@require_auth(roles=["dueno", "encargado", "demo"])
+def list_ventas():
     rows = db_all("""
-        SELECT o.*, c.first_name || ' ' || c.last_name AS customer_name
-        FROM orders o
-        LEFT JOIN customers c ON o.customer_id = c.id
-        ORDER BY o.created_at DESC
+        SELECT v.*, c.nombre AS cliente_nombre
+        FROM ventas v
+        LEFT JOIN clientes c ON v.cliente_id = c.id
+        ORDER BY v.created_at DESC
+        LIMIT 200
     """)
     return jsonify(rows)
 
 
-@app.route("/api/orders", methods=["POST"])
-@require_auth(roles=["admin", "vendedor"])
-def create_order():
+@app.route("/api/ventas", methods=["POST"])
+@require_auth(roles=["dueno", "encargado"])
+def create_venta():
     d = request.get_json(silent=True) or {}
-    customer_id = d.get("customer_id")
     items = d.get("items", [])
-    if not customer_id or not items:
-        return jsonify({"error": "customer_id e items requeridos"}), 400
+    if not items:
+        return jsonify({"error": "items requeridos"}), 400
 
     result = None
-    order_id = None
-    customer_name = ""
+    venta_id = None
+    cliente_nombre = ""
     low_stock_warnings: list[tuple[str, int, int]] = []
 
     conn = get_db_connection()
     try:
-        total = sum(float(i.get("unit_price", 0)) * int(i.get("quantity", 0)) for i in items)
+        total = sum(float(i.get("precio_unitario", 0)) * int(i.get("cantidad", 0)) for i in items)
         now = datetime.datetime.utcnow().isoformat()
         cur = conn.execute(
-            "INSERT INTO orders (customer_id, status, total, created_at) VALUES (?, 'pending', ?, ?)",
-            (customer_id, total, now),
+            "INSERT INTO ventas (cliente_id, canal, estado, total, created_at) VALUES (?, ?, 'completada', ?, ?)",
+            (d.get("cliente_id"), d.get("canal", "mostrador"), total, now),
         )
-        order_id = cur.lastrowid
+        venta_id = cur.lastrowid
         for item in items:
             conn.execute(
-                "INSERT INTO order_items (order_id, product_id, quantity, unit_price) VALUES (?, ?, ?, ?)",
-                (order_id, item["product_id"], int(item["quantity"]), float(item["unit_price"])),
+                "INSERT INTO venta_items (venta_id, producto_id, cantidad, precio_unitario) VALUES (?, ?, ?, ?)",
+                (venta_id, item["producto_id"], int(item["cantidad"]), float(item["precio_unitario"])),
             )
             conn.execute(
-                "UPDATE products SET stock = MAX(0, stock - ?) WHERE id = ?",
-                (int(item["quantity"]), item["product_id"]),
+                "UPDATE productos SET stock = MAX(0, stock - ?) WHERE id = ?",
+                (int(item["cantidad"]), item["producto_id"]),
             )
         conn.commit()
         row = rows_to_dicts(conn.execute(
-            "SELECT o.*, c.first_name || ' ' || c.last_name AS customer_name "
-            "FROM orders o LEFT JOIN customers c ON o.customer_id = c.id WHERE o.id = ?",
-            (order_id,),
+            "SELECT v.*, c.nombre AS cliente_nombre FROM ventas v "
+            "LEFT JOIN clientes c ON v.cliente_id = c.id WHERE v.id = ?",
+            (venta_id,),
         ))
         result = row[0]
-        customer_name = result.get("customer_name") or f"Cliente #{customer_id}"
-        # Check low stock while connection is open
+        cliente_nombre = result.get("cliente_nombre") or "Consumidor final"
         for item in items:
-            r = conn.execute("SELECT name, stock FROM products WHERE id = ?",
-                             (item["product_id"],)).fetchone()
-            if r and r[1] < 10:
-                low_stock_warnings.append((r[0], r[1], item["product_id"]))
+            r = conn.execute("SELECT nombre, stock, stock_minimo FROM productos WHERE id = ?",
+                             (item["producto_id"],)).fetchone()
+            if r and r[1] <= r[2]:
+                low_stock_warnings.append((r[0], r[1], item["producto_id"]))
     except Exception as e:
         conn.rollback()
         return jsonify({"error": str(e)}), 500
     finally:
         conn.close()
 
-    # Emit after DB closed
-    push_notification("new_order", "Nueva Orden",
-                      f"Orden #{order_id} creada · {customer_name} · ${total:.2f}",
-                      {"order_id": order_id})
-    for name, stock, pid in low_stock_warnings:
-        push_notification("low_stock", "Stock Bajo",
-                          f"'{name}' tiene solo {stock} unidades",
-                          {"product_id": pid})
+    push_notification("nueva_venta", "Nueva Venta",
+                      f"Venta #{venta_id} · {cliente_nombre} · ${total:,.2f}",
+                      {"venta_id": venta_id})
+    for nombre, stock, pid in low_stock_warnings:
+        push_notification("stock_bajo", "Stock Bajo",
+                          f"'{nombre}' tiene solo {stock} unidades",
+                          {"producto_id": pid})
 
     return jsonify(result), 201
 
 
-@app.route("/api/orders/<int:oid>", methods=["GET"])
-@require_auth(roles=["admin", "vendedor", "espectador"])
-def get_order(oid: int):
+@app.route("/api/ventas/<int:vid>", methods=["GET"])
+@require_auth(roles=["dueno", "encargado", "demo"])
+def get_venta(vid: int):
     conn = get_db_connection()
     try:
-        orders = rows_to_dicts(conn.execute(
-            "SELECT o.*, c.first_name || ' ' || c.last_name AS customer_name "
-            "FROM orders o LEFT JOIN customers c ON o.customer_id = c.id WHERE o.id = ?",
-            (oid,),
+        ventas = rows_to_dicts(conn.execute(
+            "SELECT v.*, c.nombre AS cliente_nombre FROM ventas v "
+            "LEFT JOIN clientes c ON v.cliente_id = c.id WHERE v.id = ?",
+            (vid,),
         ))
-        if not orders:
-            return jsonify({"error": "Orden no encontrada"}), 404
-        order = orders[0]
-        order["items"] = rows_to_dicts(conn.execute(
-            "SELECT oi.*, p.name AS product_name "
-            "FROM order_items oi JOIN products p ON oi.product_id = p.id WHERE oi.order_id = ?",
-            (oid,),
+        if not ventas:
+            return jsonify({"error": "Venta no encontrada"}), 404
+        venta = ventas[0]
+        venta["items"] = rows_to_dicts(conn.execute(
+            "SELECT vi.*, p.nombre AS producto_nombre "
+            "FROM venta_items vi JOIN productos p ON vi.producto_id = p.id WHERE vi.venta_id = ?",
+            (vid,),
         ))
-        return jsonify(order)
+        return jsonify(venta)
     finally:
         conn.close()
 
 
-@app.route("/api/orders/<int:oid>", methods=["PUT"])
-@require_auth(roles=["admin", "vendedor"])
-def update_order(oid: int):
+@app.route("/api/ventas/<int:vid>", methods=["PUT"])
+@require_auth(roles=["dueno", "encargado"])
+def update_venta(vid: int):
     d = request.get_json(silent=True) or {}
-    allowed = {"status", "total"}
+    allowed = {"estado", "total"}
     fields = {k: v for k, v in d.items() if k in allowed}
     if not fields:
         return jsonify({"error": "Sin campos válidos"}), 400
     set_clause = ", ".join(f"{k}=?" for k in fields)
-    db_run(f"UPDATE orders SET {set_clause} WHERE id=?", (*fields.values(), oid))
+    db_run(f"UPDATE ventas SET {set_clause} WHERE id=?", (*fields.values(), vid))
 
-    if "status" in fields:
-        status_labels = {
-            "pending": "Pendiente", "processing": "Procesando",
-            "shipped": "Enviado", "delivered": "Entregado", "cancelled": "Cancelado",
-        }
-        label = status_labels.get(fields["status"], fields["status"])
+    if "estado" in fields:
+        labels = {"pendiente": "Pendiente", "completada": "Completada", "cancelada": "Cancelada"}
+        label = labels.get(fields["estado"], fields["estado"])
         push_notification(
-            "status_change", "Cambio de Estado",
-            f"Orden #{oid} cambió a {label}",
-            {"order_id": oid, "status": fields["status"]},
+            "cambio_estado", "Cambio de Estado",
+            f"Venta #{vid} cambió a {label}",
+            {"venta_id": vid, "estado": fields["estado"]},
         )
     return jsonify({"ok": True})
 
 
-@app.route("/api/orders/<int:oid>", methods=["DELETE"])
-@require_auth(roles=["admin"])
-def delete_order(oid: int):
-    db_run("DELETE FROM orders WHERE id=?", (oid,))
+@app.route("/api/ventas/<int:vid>", methods=["DELETE"])
+@require_auth(roles=["dueno"])
+def delete_venta(vid: int):
+    db_run("DELETE FROM ventas WHERE id=?", (vid,))
     return jsonify({"ok": True})
 
 
-# ── Stock movements ────────────────────────────────────────────────────────
+# ── Gastos ─────────────────────────────────────────────────────────────────
 
-@app.route("/api/products/<int:pid>/movements", methods=["GET"])
-@require_auth(roles=["admin", "bodega"])
-def get_stock_movements(pid: int):
-    ensure_tables()
+@app.route("/api/gastos", methods=["GET"])
+@require_auth(roles=["dueno"])
+def list_gastos():
+    return jsonify(db_all("SELECT * FROM gastos ORDER BY created_at DESC LIMIT 200"))
+
+
+@app.route("/api/gastos", methods=["POST"])
+@require_auth(roles=["dueno"])
+def create_gasto():
+    d = request.get_json(silent=True) or {}
+    categoria = (d.get("categoria") or "").strip()
+    descripcion = (d.get("descripcion") or "").strip()
+    if not categoria or not descripcion:
+        return jsonify({"error": "categoria y descripcion requeridos"}), 400
+    now = datetime.datetime.utcnow().isoformat()
+    row_id = db_run(
+        "INSERT INTO gastos (categoria, descripcion, monto, created_at) VALUES (?,?,?,?)",
+        (categoria, descripcion, float(d.get("monto") or 0), now),
+    )
+    return jsonify({"id": row_id, "categoria": categoria, "descripcion": descripcion,
+                    "monto": d.get("monto", 0), "created_at": now}), 201
+
+
+@app.route("/api/gastos/<int:gid>", methods=["PUT"])
+@require_auth(roles=["dueno"])
+def update_gasto(gid: int):
+    d = request.get_json(silent=True) or {}
+    db_run(
+        "UPDATE gastos SET categoria=?, descripcion=?, monto=? WHERE id=?",
+        ((d.get("categoria") or "").strip(), (d.get("descripcion") or "").strip(),
+         float(d.get("monto") or 0), gid),
+    )
+    return jsonify({"ok": True})
+
+
+@app.route("/api/gastos/<int:gid>", methods=["DELETE"])
+@require_auth(roles=["dueno"])
+def delete_gasto(gid: int):
+    db_run("DELETE FROM gastos WHERE id=?", (gid,))
+    return jsonify({"ok": True})
+
+
+# ── Movimientos de stock ───────────────────────────────────────────────────
+
+@app.route("/api/productos/<int:pid>/movimientos", methods=["GET"])
+@require_auth(roles=["dueno", "encargado"])
+def get_movimientos_stock(pid: int):
     return jsonify(db_all(
-        "SELECT * FROM stock_movements WHERE product_id = ? ORDER BY created_at DESC LIMIT 100",
+        "SELECT * FROM movimientos_stock WHERE producto_id = ? ORDER BY created_at DESC LIMIT 100",
         (pid,),
     ))
 
 
-@app.route("/api/products/<int:pid>/movements", methods=["POST"])
-@require_auth(roles=["admin", "bodega"])
-def add_stock_movement(pid: int):
-    ensure_tables()
+@app.route("/api/productos/<int:pid>/movimientos", methods=["POST"])
+@require_auth(roles=["dueno", "encargado"])
+def add_movimiento_stock(pid: int):
     d = request.get_json(silent=True) or {}
-    mov_type = d.get("type", "")
-    qty = int(d.get("quantity", 0))
-    notes = (d.get("notes") or "").strip()
+    tipo = d.get("tipo", "")
+    qty = int(d.get("cantidad", 0))
+    notas = (d.get("notas") or "").strip()
     user_email = request.current_user.get("email", "")
 
-    if mov_type not in ("entrada", "salida"):
-        return jsonify({"error": "type debe ser 'entrada' o 'salida'"}), 400
+    if tipo not in ("entrada", "salida"):
+        return jsonify({"error": "tipo debe ser 'entrada' o 'salida'"}), 400
     if qty <= 0:
-        return jsonify({"error": "quantity debe ser mayor a 0"}), 400
+        return jsonify({"error": "cantidad debe ser mayor a 0"}), 400
 
     new_stock = None
-    product_name = ""
+    stock_minimo = None
+    nombre = ""
 
     conn = get_db_connection()
     try:
         now = datetime.datetime.utcnow().isoformat()
-        if mov_type == "entrada":
-            conn.execute("UPDATE products SET stock = stock + ? WHERE id = ?", (qty, pid))
+        if tipo == "entrada":
+            conn.execute("UPDATE productos SET stock = stock + ? WHERE id = ?", (qty, pid))
         else:
-            conn.execute("UPDATE products SET stock = MAX(0, stock - ?) WHERE id = ?", (qty, pid))
+            conn.execute("UPDATE productos SET stock = MAX(0, stock - ?) WHERE id = ?", (qty, pid))
         cur = conn.execute(
-            "INSERT INTO stock_movements (product_id, type, quantity, notes, user_email, created_at) "
+            "INSERT INTO movimientos_stock (producto_id, tipo, cantidad, notas, user_email, created_at) "
             "VALUES (?, ?, ?, ?, ?, ?)",
-            (pid, mov_type, qty, notes, user_email, now),
+            (pid, tipo, qty, notas, user_email, now),
         )
         conn.commit()
-        row = conn.execute("SELECT name, stock FROM products WHERE id = ?", (pid,)).fetchone()
+        row = conn.execute("SELECT nombre, stock, stock_minimo FROM productos WHERE id = ?", (pid,)).fetchone()
         if row:
-            product_name, new_stock = row[0], row[1]
+            nombre, new_stock, stock_minimo = row[0], row[1], row[2]
         mov_id = cur.lastrowid
     finally:
         conn.close()
 
-    if new_stock is not None and new_stock < 10:
+    if new_stock is not None and stock_minimo is not None and new_stock <= stock_minimo:
         push_notification(
-            "low_stock", "Stock Bajo",
-            f"'{product_name}' tiene solo {new_stock} unidades",
-            {"product_id": pid},
+            "stock_bajo", "Stock Bajo",
+            f"'{nombre}' tiene solo {new_stock} unidades",
+            {"producto_id": pid},
         )
 
     return jsonify({"id": mov_id, "new_stock": new_stock}), 201
 
 
-# ── Reports ────────────────────────────────────────────────────────────────
+# ── Reportes ───────────────────────────────────────────────────────────────
 
-@app.route("/api/reports/sales", methods=["GET"])
-@require_auth(roles=["admin", "vendedor", "espectador"])
-def report_sales():
+@app.route("/api/reports/ventas", methods=["GET"])
+@require_auth(roles=["dueno", "encargado", "demo"])
+def report_ventas():
     period = request.args.get("period", "month")
     if period == "week":
-        group_fmt, date_filter = "%Y-%W", "AND created_at >= date('now', '-8 weeks')"
+        group_fmt, date_filter = "%Y-%m-%d", "AND created_at >= date('now', '-8 days')"
     elif period == "year":
         group_fmt, date_filter = "%Y-%m", "AND created_at >= date('now', '-2 years')"
     else:
@@ -691,43 +731,43 @@ def report_sales():
 
     conn = get_db_connection()
     try:
-        sales = rows_to_dicts(conn.execute(
+        ventas = rows_to_dicts(conn.execute(
             f"SELECT strftime('{group_fmt}', created_at) AS period, "
-            "COUNT(*) AS orders, SUM(total) AS revenue "
-            f"FROM orders WHERE status != 'cancelled' {date_filter} "
+            "COUNT(*) AS ventas, SUM(total) AS revenue "
+            f"FROM ventas WHERE estado != 'cancelada' {date_filter} "
             "GROUP BY period ORDER BY period"
         ))
-        for row in sales:
+        for row in ventas:
             row["revenue"] = float(row["revenue"] or 0)
         summary = conn.execute(
-            "SELECT COUNT(*), COALESCE(SUM(total), 0) FROM orders WHERE status != 'cancelled'"
+            "SELECT COUNT(*), COALESCE(SUM(total), 0) FROM ventas WHERE estado != 'cancelada'"
         ).fetchone()
-        return jsonify({"data": sales, "total_orders": summary[0], "total_revenue": float(summary[1])})
+        return jsonify({"data": ventas, "total_ventas": summary[0], "total_revenue": float(summary[1])})
     finally:
         conn.close()
 
 
-@app.route("/api/reports/products", methods=["GET"])
-@require_auth(roles=["admin", "vendedor", "espectador"])
-def report_products():
+@app.route("/api/reports/productos", methods=["GET"])
+@require_auth(roles=["dueno", "encargado", "demo"])
+def report_productos():
     conn = get_db_connection()
     try:
         data = rows_to_dicts(conn.execute("""
-            SELECT p.id, p.name, c.name AS category,
-                   COALESCE(SUM(oi.quantity), 0) AS units_sold,
-                   COALESCE(SUM(oi.quantity * oi.unit_price), 0) AS revenue,
-                   p.price, p.stock
-            FROM products p
-            LEFT JOIN order_items oi ON p.id = oi.product_id
-            LEFT JOIN orders o ON oi.order_id = o.id AND o.status != 'cancelled'
-            LEFT JOIN categories c ON p.category_id = c.id
-            GROUP BY p.id, p.name, c.name, p.price, p.stock
+            SELECT p.id, p.nombre AS nombre, c.nombre AS categoria,
+                   COALESCE(SUM(vi.cantidad), 0) AS unidades_vendidas,
+                   COALESCE(SUM(vi.cantidad * vi.precio_unitario), 0) AS revenue,
+                   p.precio, p.stock
+            FROM productos p
+            LEFT JOIN venta_items vi ON p.id = vi.producto_id
+            LEFT JOIN ventas v ON vi.venta_id = v.id AND v.estado != 'cancelada'
+            LEFT JOIN categorias c ON p.categoria_id = c.id
+            GROUP BY p.id, p.nombre, p.precio, p.stock, c.nombre
             ORDER BY revenue DESC
             LIMIT 50
         """))
         for row in data:
             row["revenue"] = float(row["revenue"] or 0)
-            row["price"] = float(row["price"] or 0)
+            row["precio"] = float(row["precio"] or 0)
         return jsonify(data)
     finally:
         conn.close()
@@ -738,7 +778,6 @@ def report_products():
 @app.route("/api/notifications", methods=["GET"])
 @require_auth()
 def get_notifications():
-    ensure_tables()
     rows = db_all("SELECT * FROM notifications ORDER BY created_at DESC LIMIT 50")
     for r in rows:
         r["read"] = bool(r["read"])
@@ -766,50 +805,74 @@ def mark_all_notifications_read():
 # ── Dashboard ──────────────────────────────────────────────────────────────
 
 @app.route("/api/dashboard", methods=["GET"])
-@require_auth(roles=["admin", "vendedor", "espectador"])
+@require_auth(roles=["dueno", "encargado", "demo"])
 def dashboard():
     conn = get_db_connection()
     try:
-        total_sales = conn.execute(
-            "SELECT COALESCE(SUM(total), 0) FROM orders WHERE status != 'cancelled'"
+        ventas_hoy = conn.execute(
+            "SELECT COALESCE(SUM(total), 0), COUNT(*) FROM ventas "
+            "WHERE estado != 'cancelada' AND date(created_at) = date('now')"
+        ).fetchone()
+        ventas_semana = conn.execute(
+            "SELECT COALESCE(SUM(total), 0), COUNT(*) FROM ventas "
+            "WHERE estado != 'cancelada' AND created_at >= date('now', '-7 days')"
+        ).fetchone()
+        ventas_mes = conn.execute(
+            "SELECT COALESCE(SUM(total), 0), COUNT(*) FROM ventas "
+            "WHERE estado != 'cancelada' AND strftime('%Y-%m', created_at) = strftime('%Y-%m', 'now')"
+        ).fetchone()
+        gastos_mes = conn.execute(
+            "SELECT COALESCE(SUM(monto), 0) FROM gastos "
+            "WHERE strftime('%Y-%m', created_at) = strftime('%Y-%m', 'now')"
         ).fetchone()[0]
-        monthly_orders = conn.execute(
-            "SELECT COUNT(*) FROM orders WHERE strftime('%Y-%m', created_at) = strftime('%Y-%m', 'now')"
+        margen_mes = conn.execute(
+            "SELECT COALESCE(SUM((vi.precio_unitario - p.costo) * vi.cantidad), 0) "
+            "FROM venta_items vi JOIN productos p ON vi.producto_id = p.id "
+            "JOIN ventas v ON vi.venta_id = v.id "
+            "WHERE v.estado != 'cancelada' AND strftime('%Y-%m', v.created_at) = strftime('%Y-%m', 'now')"
         ).fetchone()[0]
-        low_stock_count = conn.execute(
-            "SELECT COUNT(*) FROM products WHERE stock < 10"
+        stock_critico = conn.execute(
+            "SELECT COUNT(*) FROM productos WHERE stock <= stock_minimo"
         ).fetchone()[0]
-        total_customers = conn.execute("SELECT COUNT(*) FROM customers").fetchone()[0]
-        sales_by_month = rows_to_dicts(conn.execute("""
-            SELECT strftime('%Y-%m', created_at) AS month,
-                   SUM(total) AS total, COUNT(*) AS orders
-            FROM orders
-            WHERE status != 'cancelled' AND created_at >= date('now', '-6 months')
-            GROUP BY month ORDER BY month
+        total_clientes = conn.execute("SELECT COUNT(*) FROM clientes").fetchone()[0]
+        ventas_por_dia = rows_to_dicts(conn.execute("""
+            SELECT date(created_at) AS dia, SUM(total) AS total, COUNT(*) AS ventas
+            FROM ventas
+            WHERE estado != 'cancelada' AND created_at >= date('now', '-30 days')
+            GROUP BY dia ORDER BY dia
         """))
-        top_products = rows_to_dicts(conn.execute("""
-            SELECT p.name, SUM(oi.quantity) AS units_sold,
-                   SUM(oi.quantity * oi.unit_price) AS revenue
-            FROM order_items oi
-            JOIN products p ON oi.product_id = p.id
-            JOIN orders o ON oi.order_id = o.id
-            WHERE o.status != 'cancelled'
-            GROUP BY p.id, p.name ORDER BY units_sold DESC LIMIT 5
+        for row in ventas_por_dia:
+            row["total"] = float(row["total"] or 0)
+        top_productos = rows_to_dicts(conn.execute("""
+            SELECT p.nombre, SUM(vi.cantidad) AS unidades_vendidas,
+                   SUM(vi.cantidad * vi.precio_unitario) AS revenue
+            FROM venta_items vi
+            JOIN productos p ON vi.producto_id = p.id
+            JOIN ventas v ON vi.venta_id = v.id
+            WHERE v.estado != 'cancelada'
+            GROUP BY p.id, p.nombre ORDER BY unidades_vendidas DESC LIMIT 5
         """))
-        recent_orders = rows_to_dicts(conn.execute("""
-            SELECT o.id, c.first_name || ' ' || c.last_name AS customer_name,
-                   o.status, o.total, o.created_at
-            FROM orders o LEFT JOIN customers c ON o.customer_id = c.id
-            ORDER BY o.created_at DESC LIMIT 10
+        ventas_recientes = rows_to_dicts(conn.execute("""
+            SELECT v.id, c.nombre AS cliente_nombre, v.canal, v.estado, v.total, v.created_at
+            FROM ventas v LEFT JOIN clientes c ON v.cliente_id = c.id
+            ORDER BY v.created_at DESC LIMIT 10
+        """))
+        productos_stock_critico = rows_to_dicts(conn.execute("""
+            SELECT id, nombre, stock, stock_minimo FROM productos
+            WHERE stock <= stock_minimo ORDER BY stock ASC LIMIT 10
         """))
         return jsonify({
-            "total_sales": float(total_sales),
-            "monthly_orders": int(monthly_orders),
-            "low_stock_count": int(low_stock_count),
-            "total_customers": int(total_customers),
-            "sales_by_month": sales_by_month,
-            "top_products": top_products,
-            "recent_orders": recent_orders,
+            "ventas_hoy": {"total": float(ventas_hoy[0]), "cantidad": int(ventas_hoy[1])},
+            "ventas_semana": {"total": float(ventas_semana[0]), "cantidad": int(ventas_semana[1])},
+            "ventas_mes": {"total": float(ventas_mes[0]), "cantidad": int(ventas_mes[1])},
+            "gastos_mes": float(gastos_mes),
+            "margen_mes": float(margen_mes),
+            "stock_critico_count": int(stock_critico),
+            "total_clientes": int(total_clientes),
+            "ventas_por_dia": ventas_por_dia,
+            "top_productos": top_productos,
+            "ventas_recientes": ventas_recientes,
+            "productos_stock_critico": productos_stock_critico,
         })
     finally:
         conn.close()
@@ -825,6 +888,21 @@ def on_connect():
 @socketio.on("disconnect")
 def on_disconnect():
     pass
+
+
+# ── Agente autónomo (agent.py) ────────────────────────────────────────────
+
+agent.register(app, socketio, agent.Deps(
+    get_db_connection=get_db_connection,
+    db_all=db_all,
+    db_run=db_run,
+    push_notification=push_notification,
+    get_anthropic_client=get_anthropic_client,
+    require_auth=require_auth,
+    execute_query=execute_query,
+    db_path=DB_PATH,
+    db_schema=DB_SCHEMA,
+))
 
 
 if __name__ == '__main__':

@@ -1,189 +1,190 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
-import Analytics from '@carbon/icons-react/es/Analytics'
-import OrderDetails from '@carbon/icons-react/es/OrderDetails'
-import WarningAlt from '@carbon/icons-react/es/WarningAlt'
-import UserMultiple from '@carbon/icons-react/es/UserMultiple'
 import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer,
+  BarChart, Bar, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from 'recharts'
-import type { DashboardMetrics, OrderStatus, AppView } from '@/types'
+import { TrendingUp, TrendingDown, Wallet, PiggyBank, PackageX, Users2 } from 'lucide-react'
 import { api } from '@/lib/api'
-import { ErrorBanner } from './shared'
+import type { AppView, DashboardMetrics } from '@/types'
+import { CategoryBadge, CANAL_LABEL } from './shared'
 
-const STATUS_LABELS: Record<OrderStatus, string> = {
-  pending: 'Pendiente', processing: 'Procesando', shipped: 'Enviado',
-  delivered: 'Entregado', cancelled: 'Cancelado',
+const currency = new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 })
+
+function formatCompact(v: number): string {
+  const abs = Math.abs(v)
+  if (abs >= 1_000_000) return `$${(v / 1_000_000).toFixed(abs % 1_000_000 === 0 ? 0 : 1)}M`
+  if (abs >= 1_000) return `$${(v / 1_000).toFixed(abs % 1_000 === 0 ? 0 : 1)}K`
+  return `$${v}`
 }
 
-const STATUS_COLORS: Record<OrderStatus, string> = {
-  pending: 'text-yellow-500', processing: 'text-blue-400', shipped: 'text-blue-400',
-  delivered: 'text-emerald-400', cancelled: 'text-red-400',
-}
-
-type CardAccent = 'green' | 'blue' | 'yellow' | 'cyan'
-
-const ACCENT_CLS: Record<CardAccent, { border: string; icon: string; bar: string }> = {
-  green:  { border: 'border-l-emerald-500/50', icon: 'bg-emerald-500/10 text-emerald-400', bar: 'border-l-4' },
-  blue:   { border: 'border-l-blue-500/50',    icon: 'bg-blue-500/10 text-blue-400',       bar: 'border-l-4' },
-  yellow: { border: 'border-l-yellow-500/50',  icon: 'bg-yellow-500/10 text-yellow-500',   bar: 'border-l-4' },
-  cyan:   { border: 'border-l-primary/50',     icon: 'bg-primary/10 text-primary',         bar: 'border-l-4' },
-}
-
-function MetricCard({ title, value, sub, icon, warn, onClick, accent = 'cyan' }: {
-  title: string; value: string; sub?: string
-  icon: React.ReactNode; warn?: boolean; onClick?: () => void; accent?: CardAccent
+function KpiTile({
+  label, value, sub, icon, tone = 'default',
+}: {
+  label: string; value: string; sub?: string; icon: React.ReactNode
+  tone?: 'default' | 'positive' | 'warning' | 'critical'
 }) {
-  const ac = warn ? ACCENT_CLS.yellow : ACCENT_CLS[accent]
-  const Tag = onClick ? 'button' : 'div'
+  const toneCls = {
+    default: 'text-primary bg-primary/10 border-primary/20',
+    positive: 'text-positive bg-positive/10 border-positive/20',
+    warning: 'text-warning bg-warning/10 border-warning/20',
+    critical: 'text-critical bg-critical/10 border-critical/20',
+  }[tone]
+
   return (
-    <Tag
-      type={onClick ? 'button' : undefined}
-      onClick={onClick}
-      className={`rounded-xl border border-border ${ac.bar} ${ac.border} bg-card p-5 flex flex-col gap-2 text-left
-        ${onClick ? 'hover:bg-muted/20 cursor-pointer' : ''}`}
-    >
+    <div className="rounded-2xl border border-border bg-card p-4 flex flex-col gap-3 shadow-stamp-sm">
       <div className="flex items-center justify-between">
-        <span className="text-xs font-mono text-muted-foreground uppercase tracking-wider">{title}</span>
-        <div className={`size-8 rounded-lg flex items-center justify-center ${ac.icon}`}>
+        <span className="text-xs font-medium text-muted-foreground">{label}</span>
+        <div className={`size-8 rounded-full border-2 flex items-center justify-center shrink-0 ${toneCls}`}>
           {icon}
         </div>
       </div>
-      <span className={`text-2xl font-mono font-semibold tabular-nums ${warn ? 'text-yellow-500' : 'text-foreground'}`}>{value}</span>
-      {sub && <span className="text-xs text-muted-foreground">{sub}</span>}
-    </Tag>
+      <div>
+        <p className="text-2xl font-mono font-bold text-foreground tracking-tight">{value}</p>
+        {sub && <p className="text-[11px] text-muted-foreground mt-0.5">{sub}</p>}
+      </div>
+    </div>
   )
 }
 
-const monthLabel = (m: string) => {
-  const [y, mo] = m.split('-')
-  return new Date(parseInt(y), parseInt(mo) - 1).toLocaleDateString('es-AR', { month: 'short' })
-}
-
-export function DashboardView({ onNavigate }: { onNavigate?: (v: AppView) => void }) {
+export function DashboardView({ onNavigate }: { onNavigate: (v: AppView) => void }) {
   const [data, setData] = useState<DashboardMetrics | null>(null)
-  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const load = useCallback(async () => {
-    setLoading(true); setError(null)
-    try { setData(await api.dashboard.get()) }
-    catch (e) { setError(e instanceof Error ? e.message : 'Error al cargar') }
-    finally { setLoading(false) }
+  useEffect(() => {
+    api.dashboard.get().then(setData).catch(e => setError(e.message))
   }, [])
 
-  useEffect(() => { load() }, [load])
+  const avgVentas = useMemo(() => {
+    if (!data || data.ventas_por_dia.length === 0) return 0
+    return data.ventas_por_dia.reduce((s, d) => s + d.total, 0) / data.ventas_por_dia.length
+  }, [data])
 
-  if (loading) {
+  if (error) {
     return (
-      <div className="p-6 flex flex-col gap-6">
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {[...Array(4)].map((_, i) => (
-            <div key={i} className="rounded-xl border border-border bg-card p-5 h-28 animate-pulse" />
-          ))}
-        </div>
-        <div className="rounded-xl border border-border bg-card h-64 animate-pulse" />
+      <div className="p-6">
+        <div className="rounded-xl border border-critical/30 bg-critical/5 text-critical text-sm px-4 py-3">{error}</div>
       </div>
     )
   }
 
-  if (error) return <div className="p-6"><ErrorBanner message={error} onRetry={load} /></div>
-  if (!data) return null
+  if (!data) {
+    return (
+      <div className="p-6 grid grid-cols-2 md:grid-cols-3 gap-4">
+        {[...Array(6)].map((_, i) => (
+          <div key={i} className="h-28 rounded-2xl bg-muted/30 animate-pulse" />
+        ))}
+      </div>
+    )
+  }
 
-  const chartData = data.sales_by_month.map(m => ({
-    month: monthLabel(m.month),
-    ventas: Math.round(m.total),
-  }))
+  const margenPositivo = data.margen_mes >= 0
 
   return (
     <motion.div
-      key="dashboard"
-      initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }}
-      className="p-6 flex flex-col gap-6"
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }}
+      className="p-6 flex flex-col gap-6 max-w-6xl mx-auto"
     >
-      {/* Metric cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <MetricCard
-          title="Ventas Totales"
-          value={`$${data.total_sales.toLocaleString('es-AR', { maximumFractionDigits: 0 })}`}
-          sub="Órdenes no canceladas"
-          icon={<Analytics size={16} />}
-          accent="green"
-        />
-        <MetricCard
-          title="Órdenes del Mes"
-          value={String(data.monthly_orders)}
-          sub="Mes actual"
-          icon={<OrderDetails size={16} />}
-          accent="blue"
-        />
-        <MetricCard
-          title="Stock Bajo"
-          value={String(data.low_stock_count)}
-          sub={data.low_stock_count > 0 ? 'Ver productos afectados →' : 'Sin alertas'}
-          icon={<WarningAlt size={16} />}
-          warn={data.low_stock_count > 0}
-          accent="yellow"
-          onClick={data.low_stock_count > 0 ? () => onNavigate?.('lowstock') : undefined}
-        />
-        <MetricCard
-          title="Clientes"
-          value={String(data.total_customers)}
-          icon={<UserMultiple size={16} />}
-          accent="cyan"
-        />
+      <div>
+        <h1 className="text-xl font-serif text-foreground">Dashboard</h1>
+        <p className="text-xs text-muted-foreground font-mono mt-0.5">Vista general del negocio</p>
       </div>
 
-      {/* Chart + top products */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2 rounded-xl border border-border bg-card p-5">
-          <h2 className="text-sm font-semibold text-foreground mb-4">Ventas — últimos 6 meses</h2>
-          {chartData.length === 0 ? (
-            <div className="h-44 flex items-center justify-center text-muted-foreground text-sm">Sin datos</div>
-          ) : (
-            <ResponsiveContainer width="100%" height={180}>
-              <AreaChart data={chartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="salesGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#22c55e" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="currentColor" strokeOpacity={0.08} vertical={false} />
-                <XAxis dataKey="month" tick={{ fill: '#71717a', fontSize: 11 }} axisLine={false} tickLine={false} />
-                <YAxis
-                  tick={{ fill: '#71717a', fontSize: 11 }} axisLine={false} tickLine={false} width={56}
-                  tickFormatter={v => `$${(v / 1000).toFixed(0)}k`}
-                />
-                <Tooltip
-                  contentStyle={{ background: 'hsl(231 36% 8%)', border: '1px solid hsl(231 34% 15%)', borderRadius: 8, fontSize: 12 }}
-                  labelStyle={{ color: '#71717a', fontWeight: 600 }}
-                  itemStyle={{ color: '#22c55e' }}
-                  formatter={(v) => [`$${Number(v).toLocaleString('es-AR')}`, 'Ventas']}
-                />
-                <Area
-                  type="monotone" dataKey="ventas" stroke="#22c55e" strokeWidth={2}
-                  fill="url(#salesGrad)" dot={false}
-                  isAnimationActive={true} animationDuration={800} animationEasing="ease-out"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
+      {/* KPI tiles */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        <KpiTile label="Ventas hoy" value={currency.format(data.ventas_hoy.total)}
+          sub={`${data.ventas_hoy.cantidad} ventas`} icon={<TrendingUp size={15} />} tone="positive" />
+        <KpiTile label="Ventas semana" value={currency.format(data.ventas_semana.total)}
+          sub={`${data.ventas_semana.cantidad} ventas`} icon={<TrendingUp size={15} />} />
+        <KpiTile label="Ventas mes" value={currency.format(data.ventas_mes.total)}
+          sub={`${data.ventas_mes.cantidad} ventas`} icon={<Wallet size={15} />} />
+        <KpiTile label="Gastos del mes" value={currency.format(data.gastos_mes)}
+          icon={<PiggyBank size={15} />} tone="warning" />
+        <KpiTile label="Margen del mes" value={currency.format(data.margen_mes)}
+          icon={margenPositivo ? <TrendingUp size={15} /> : <TrendingDown size={15} />}
+          tone={margenPositivo ? 'positive' : 'critical'} />
+        <KpiTile label="Stock crítico" value={String(data.stock_critico_count)}
+          sub="productos bajo mínimo" icon={<PackageX size={15} />}
+          tone={data.stock_critico_count > 0 ? 'critical' : 'default'} />
+      </div>
+
+      {/* Trend chart */}
+      <div className="rounded-2xl border border-border bg-card p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-sm font-semibold text-foreground">Ventas — últimos 30 días</h2>
+          {data.ventas_por_dia.some(d => d.total < avgVentas * 0.6) && (
+            <span className="flex items-center gap-1.5 text-[11px] text-critical">
+              <span className="size-1.5 rounded-full bg-critical" />
+              Desvío detectado
+            </span>
           )}
         </div>
+        <ResponsiveContainer width="100%" height={220}>
+          <BarChart data={data.ventas_por_dia} margin={{ top: 8, right: 8, left: 0, bottom: 0 }} barCategoryGap="18%">
+            <CartesianGrid strokeDasharray="4 3" stroke="hsl(var(--border))" vertical={false} />
+            <XAxis dataKey="dia" tick={{ fontSize: 10, fontFamily: 'Courier Prime, monospace', fill: 'hsl(var(--muted-foreground))' }}
+              tickFormatter={v => v.slice(5)} axisLine={{ stroke: 'hsl(var(--foreground))' }} tickLine={false} />
+            <YAxis tick={{ fontSize: 10, fontFamily: 'Courier Prime, monospace', fill: 'hsl(var(--muted-foreground))' }}
+              axisLine={false} tickLine={false} tickFormatter={formatCompact} width={48} />
+            <Tooltip
+              cursor={{ fill: 'hsl(var(--foreground) / 0.05)' }}
+              contentStyle={{ background: 'hsl(var(--card))', border: '2px solid hsl(var(--foreground))', borderRadius: 4, fontSize: 12, boxShadow: '3px 3px 0 0 hsl(var(--foreground) / 0.15)' }}
+              labelStyle={{ color: 'hsl(var(--muted-foreground))', fontFamily: 'Karla, sans-serif' }}
+              formatter={(v) => [currency.format(Number(v ?? 0)), 'Ventas']}
+            />
+            <Bar dataKey="total" radius={[2, 2, 0, 0]}>
+              {data.ventas_por_dia.map((d, i) => (
+                <Cell
+                  key={i}
+                  fill={avgVentas > 0 && d.total < avgVentas * 0.6 ? 'hsl(var(--critical))' : 'hsl(var(--primary))'}
+                  stroke="hsl(var(--foreground))"
+                  strokeWidth={1}
+                  strokeOpacity={0.15}
+                />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
 
-        <div className="rounded-xl border border-border bg-card p-5">
-          <h2 className="text-sm font-semibold text-foreground mb-4">Top 5 Productos</h2>
-          {data.top_products.length === 0 ? (
-            <span className="text-sm text-muted-foreground">Sin datos</span>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Top productos */}
+        <div className="rounded-2xl border border-border bg-card p-5">
+          <h2 className="text-sm font-semibold text-foreground mb-4">Productos más vendidos</h2>
+          <div className="flex flex-col gap-3">
+            {data.top_productos.length === 0 && <p className="text-xs text-muted-foreground">Sin datos aún.</p>}
+            {data.top_productos.map((p, i) => {
+              const max = Math.max(...data.top_productos.map(tp => tp.revenue), 1)
+              return (
+                <div key={i} className="flex flex-col gap-1">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-foreground/90 truncate">{p.nombre}</span>
+                    <span className="font-mono text-muted-foreground shrink-0 ml-2">{currency.format(p.revenue)}</span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-muted/40 overflow-hidden">
+                    <div className="h-full bg-primary rounded-full" style={{ width: `${(p.revenue / max) * 100}%` }} />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* Stock crítico */}
+        <div className="rounded-2xl border border-border bg-card p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-semibold text-foreground">Stock crítico</h2>
+            <button onClick={() => onNavigate('productos')} className="text-[11px] text-primary hover:underline cursor-pointer">
+              Ver productos →
+            </button>
+          </div>
+          {data.productos_stock_critico.length === 0 ? (
+            <p className="text-xs text-muted-foreground">Todo el stock está por encima del mínimo.</p>
           ) : (
-            <div className="flex flex-col gap-3">
-              {data.top_products.map((p, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  <span className="text-[11px] font-mono text-muted-foreground w-4 shrink-0 text-right">{i + 1}</span>
-                  <span className="text-xs text-foreground flex-1 truncate">{p.name}</span>
-                  <span className="text-xs font-mono text-primary shrink-0">{p.units_sold} u.</span>
+            <div className="flex flex-col gap-2">
+              {data.productos_stock_critico.map(p => (
+                <div key={p.id} className="flex items-center justify-between px-3 py-2 rounded-lg bg-critical/5 border border-critical/20">
+                  <span className="text-xs text-foreground/90 truncate">{p.nombre}</span>
+                  <span className="text-[11px] font-mono text-critical shrink-0 ml-2">{p.stock} / {p.stock_minimo}</span>
                 </div>
               ))}
             </div>
@@ -191,40 +192,34 @@ export function DashboardView({ onNavigate }: { onNavigate?: (v: AppView) => voi
         </div>
       </div>
 
-      {/* Recent orders */}
-      <div className="rounded-xl border border-border bg-card overflow-hidden">
-        <div className="px-5 py-3 border-b border-border">
-          <h2 className="text-sm font-semibold text-foreground">Órdenes Recientes</h2>
+      {/* Ventas recientes */}
+      <div className="rounded-2xl border border-border bg-card p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-sm font-semibold text-foreground">Ventas recientes</h2>
+          <button onClick={() => onNavigate('ventas')} className="text-[11px] text-primary hover:underline cursor-pointer">
+            Ver todas →
+          </button>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-muted/30 border-b border-border">
-                {['# Orden', 'Cliente', 'Estado', 'Total', 'Fecha'].map((h, i) => (
-                  <th key={h} className={`px-4 py-2.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider ${i === 3 ? 'text-right' : 'text-left'}`}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {data.recent_orders.length === 0 ? (
-                <tr><td colSpan={5} className="px-4 py-8 text-center text-muted-foreground text-sm">Sin órdenes</td></tr>
-              ) : data.recent_orders.map(o => (
-                <tr key={o.id} className="border-b border-border/50 hover:bg-muted/20 transition-colors duration-200">
-                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground">#{o.id}</td>
-                  <td className="px-4 py-3 font-medium whitespace-nowrap">{o.customer_name}</td>
-                  <td className="px-4 py-3">
-                    <span className={`text-xs font-medium ${STATUS_COLORS[o.status]}`}>
-                      {STATUS_LABELS[o.status]}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-right font-mono font-semibold">${o.total.toFixed(2)}</td>
-                  <td className="px-4 py-3 text-muted-foreground text-xs font-mono whitespace-nowrap">
-                    {o.created_at ? new Date(o.created_at).toLocaleDateString('es-AR') : '—'}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="flex flex-col">
+          <div className="grid grid-cols-[1fr_130px_110px] gap-2 items-center pb-2 border-b border-border">
+            <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Cliente</span>
+            <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide text-center">Canal</span>
+            <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide text-right">Total</span>
+          </div>
+          <div className="flex flex-col divide-y divide-border/50">
+            {data.ventas_recientes.map(v => (
+              <div key={v.id} className="grid grid-cols-[1fr_130px_110px] gap-2 items-center py-2.5 text-xs">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Users2 size={13} className="text-muted-foreground shrink-0" />
+                  <span className="text-foreground/90 truncate">{v.cliente_nombre ?? 'Consumidor final'}</span>
+                </div>
+                <span className="flex justify-center">
+                  <CategoryBadge category={CANAL_LABEL[v.canal]} />
+                </span>
+                <span className="font-mono text-foreground text-right">{currency.format(v.total)}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </motion.div>
